@@ -1,0 +1,1124 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>TS Priority Queue</title>
+<meta name="description" content="Weekly troubleshoot priority queue for all GMs — eligibility, bucket classification, and PNL/RTO movement.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lexend:wght@500;600;700&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after{ box-sizing:border-box; }
+  html, body{ margin:0; padding:0; }
+  :root{
+    --bg:#f4f5f7; --surface:#ffffff; --surface-2:#eef0f3; --border:#dfe2e8;
+    --text:#1b1e25; --text-muted:#666d7a; --text-faint:#8b93a1;
+    --accent:#0f766e; --accent-2:#14b8a6; --accent-soft:#e6f6f4; --accent-contrast:#ffffff;
+    --done-fg:#065f46; --done-bg:#d1fae5;
+    --pending-fg:#92400e; --pending-bg:#fef3c7;
+    --auto-fg:#3730a3; --auto-bg:#e0e7ff;
+    --up-fg:#059669; --down-fg:#dc2626; --flat-fg:#8b93a1;
+    --b-objective:#7c3aed; --b-potential:#059669; --b-breakeven:#0d9488; --b-health:#2563eb; --b-pending:#dc2626; --b-zerogmv:#c2410c;
+    --shadow: 0 1px 2px rgba(20,22,30,.04), 0 8px 24px rgba(20,22,30,.06);
+    --radius:14px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#0f1115; --surface:#171a20; --surface-2:#1e222a; --border:#2a2f39;
+      --text:#e9ebf1; --text-muted:#9aa1b1; --text-faint:#6d7382;
+      --accent:#2dd4bf; --accent-2:#5eead4; --accent-soft:#122824; --accent-contrast:#08211d;
+      --done-fg:#7fe0bb; --done-bg:#0f2e26;
+      --pending-fg:#fbbf6a; --pending-bg:#3a2a12;
+      --auto-fg:#b4bbff; --auto-bg:#242763;
+      --up-fg:#34d399; --down-fg:#f0554f; --flat-fg:#6d7382;
+      --b-objective:#a78bfa; --b-potential:#34d399; --b-breakeven:#2dd4bf; --b-health:#5b8cff; --b-pending:#f0554f; --b-zerogmv:#fb923c;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#0f1115; --surface:#171a20; --surface-2:#1e222a; --border:#2a2f39;
+    --text:#e9ebf1; --text-muted:#9aa1b1; --text-faint:#6d7382;
+    --accent:#2dd4bf; --accent-2:#5eead4; --accent-soft:#122824; --accent-contrast:#08211d;
+    --done-fg:#7fe0bb; --done-bg:#0f2e26;
+    --pending-fg:#fbbf6a; --pending-bg:#3a2a12;
+    --auto-fg:#b4bbff; --auto-bg:#242763;
+    --up-fg:#34d399; --down-fg:#f0554f; --flat-fg:#6d7382;
+    --b-objective:#a78bfa; --b-potential:#34d399; --b-breakeven:#2dd4bf; --b-health:#5b8cff; --b-pending:#f0554f; --b-zerogmv:#fb923c;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    color-scheme: dark;
+  }
+  *{box-sizing:border-box;}
+  body{ background:var(--bg); color:var(--text); font-family:"Public Sans",-apple-system,BlinkMacSystemFont,sans-serif; padding-inline:16px; }
+  h1,h2,h3{ font-family:"Lexend","Public Sans",sans-serif; text-wrap:balance; margin:0; }
+  .mono{ font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+  button{ font-family:inherit; cursor:pointer; }
+  .wrap{ max-width:1500px; margin:0 auto; padding-block:20px 48px; }
+
+  .topbar{ display:flex; flex-wrap:wrap; align-items:center; gap:12px 18px; padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid var(--border); }
+  .brand{ display:flex; align-items:center; gap:10px; margin-right:auto; }
+  .brand-mark{ width:34px; height:34px; border-radius:9px; flex:none; background:linear-gradient(145deg,var(--accent),var(--accent-2)); display:flex; align-items:center; justify-content:center; }
+  .brand-mark svg{ width:18px; height:18px; }
+  .brand h1{ font-size:17px; font-weight:700; letter-spacing:-.01em; }
+  .brand .sub{ font-size:12px; color:var(--text-muted); margin-top:1px; }
+  .asof-pill{ font-size:11px; font-weight:600; padding:5px 10px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); }
+  .theme-btn{ width:32px; height:32px; border-radius:9px; border:1px solid var(--border); background:var(--surface); display:flex; align-items:center; justify-content:center; color:var(--text-muted); box-shadow:var(--shadow); }
+  .theme-btn:hover{ color:var(--accent); }
+
+  .tabs{ display:flex; gap:4px; margin-bottom:16px; border-bottom:1px solid var(--border); overflow-x:auto; }
+  .tabs button{ border:none; background:none; padding:10px 14px; font-size:13px; font-weight:600; color:var(--text-muted); white-space:nowrap; border-bottom:2px solid transparent; margin-bottom:-1px; }
+  .tabs button.active{ color:var(--accent); border-bottom-color:var(--accent); }
+
+  .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:12px; }
+  .stat-tile{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 15px; box-shadow:var(--shadow); }
+  .stat-tile .n{ font-family:"IBM Plex Mono",monospace; font-size:23px; font-weight:600; letter-spacing:-.02em; }
+  .stat-tile .l{ font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .stat-tile .cap{ font-size:11px; color:var(--text-faint); margin-top:2px; }
+
+  .caveat{ background:var(--surface); border:1px solid var(--border); border-left:3px solid var(--accent); border-radius:10px; padding:11px 14px; font-size:12px; color:var(--text-muted); margin-bottom:14px; line-height:1.5; }
+  .caveat b{ color:var(--text); }
+  .caveat .x{ float:right; background:none; border:none; color:var(--text-faint); font-size:14px; line-height:1; padding:0 0 0 10px; }
+
+  .controls{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; align-items:center; }
+  .seg{ display:flex; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface); box-shadow:var(--shadow); }
+  .seg button{ border:none; background:none; padding:8px 13px; font-size:12.5px; font-weight:600; color:var(--text-muted); white-space:nowrap; }
+  .seg button.active{ background:var(--accent-soft); color:var(--accent); }
+  .search{ flex:1; min-width:160px; border:1px solid var(--border); background:var(--surface); border-radius:10px; padding:8px 12px; font-size:13px; color:var(--text); box-shadow:var(--shadow); }
+  select.field{ border:1px solid var(--border); background:var(--surface); border-radius:10px; padding:8px 12px; font-size:12.5px; color:var(--text); box-shadow:var(--shadow); }
+  .btn-download{ border:1px solid var(--border); background:var(--surface); border-radius:10px; padding:8px 13px; font-size:12.5px; font-weight:600; color:var(--text-muted); box-shadow:var(--shadow); white-space:nowrap; }
+  .btn-download:hover{ color:var(--accent); border-color:var(--accent); }
+  .btn-download-sm{ border:none; background:none; color:var(--text-faint); font-size:12px; padding:2px 6px; border-radius:6px; }
+  .btn-download-sm:hover{ color:var(--accent); background:var(--surface-2); }
+  .dl-toast{ position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--text); color:var(--bg); font-size:12.5px; font-weight:600; padding:11px 20px; border-radius:16px; z-index:60; box-shadow:var(--shadow); max-width:min(90vw, 480px); text-align:center; line-height:1.4; }
+
+  .layout{ display:grid; grid-template-columns:220px 1fr; gap:16px; align-items:start; }
+  .sidebar{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px; position:sticky; top:12px; box-shadow:var(--shadow); max-height:calc(100vh - 30px); overflow-y:auto; }
+  .sidebar h3{ font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--text-faint); margin-bottom:8px; font-weight:600; }
+  .gm-search{ width:100%; border:1px solid var(--border); background:var(--surface-2); border-radius:8px; padding:7px 9px; font-size:12.5px; color:var(--text); margin-bottom:8px; }
+  .gm-row{ width:100%; display:flex; align-items:center; gap:8px; padding:7px 8px; border-radius:8px; border:none; background:none; color:var(--text); font-size:12.6px; text-align:left; }
+  .gm-row:hover{ background:var(--surface-2); }
+  .gm-row.active{ background:var(--accent-soft); color:var(--accent); font-weight:600; }
+  .gm-row .name{ flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .gm-row .badge{ min-width:16px; height:16px; padding:0 4px; border-radius:999px; background:var(--pending-bg); color:var(--pending-fg); font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; }
+  .gm-row .badge:empty{ display:none; }
+  .gm-row.overall-row{ font-weight:700; border-bottom:1px solid var(--border); border-radius:8px 8px 0 0; margin-bottom:5px; padding-bottom:10px; }
+
+  .bucket{ margin-bottom:14px; border:1px solid var(--border); border-radius:var(--radius); background:var(--surface); box-shadow:var(--shadow); overflow:hidden; }
+  .bucket-head{ display:flex; align-items:center; gap:10px; padding:13px 16px; cursor:pointer; }
+  .bucket-head .stripe{ width:4px; align-self:stretch; border-radius:4px; }
+  .bucket-head .title{ font-weight:700; font-size:14px; }
+  .bucket-head .desc{ font-size:11.5px; color:var(--text-faint); }
+  .bucket-head .count{ font-family:"IBM Plex Mono",monospace; font-size:13px; font-weight:600; color:var(--text-muted); }
+  .bucket-head .tue-tag{ font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; background:var(--accent-soft); color:var(--accent); padding:3px 8px; border-radius:999px; }
+  .bucket-head .chev{ margin-left:auto; transition:transform .15s; color:var(--text-faint); }
+  .bucket.collapsed .chev{ transform:rotate(-90deg); }
+  .bucket.collapsed .bucket-body{ display:none; }
+
+  .row-head, .row{ display:grid; grid-template-columns: 1.5fr .9fr .8fr .8fr .8fr .9fr .8fr .9fr .9fr .9fr 1fr; gap:6px; padding:9px 16px; align-items:center; font-size:12px; }
+  .row-head{ background:var(--surface-2); color:var(--text-faint); font-size:10px; text-transform:uppercase; letter-spacing:.02em; font-weight:600; }
+  .row-head .sortable, th.sortable{ cursor:pointer; user-select:none; }
+  .row-head .sortable:hover, th.sortable:hover{ color:var(--accent); }
+  .row{ border-top:1px solid var(--border); }
+  .row:hover{ background:var(--surface-2); }
+  .row .seller{ font-weight:600; }
+  .row .sid{ font-size:9.5px; color:var(--text-faint); font-family:"IBM Plex Mono",monospace; }
+  .src-tag{ font-size:9.5px; font-weight:700; padding:2px 6px; border-radius:999px; background:var(--surface-2); color:var(--text-muted); text-transform:uppercase; letter-spacing:.02em; width:fit-content; }
+  .trend{ display:flex; align-items:center; gap:3px; }
+  .trend .arrow{ font-size:11px; }
+  .trend.up{ color:var(--up-fg); } .trend.down{ color:var(--down-fg); } .trend.flat{ color:var(--flat-fg); }
+  .na{ color:var(--text-faint); font-size:10.5px; }
+  .clr-green{ color:var(--up-fg); font-weight:700; }
+  .clr-yellow{ color:var(--pending-fg); font-weight:700; }
+  .clr-red{ color:var(--down-fg); font-weight:700; }
+  .rto-src{ font-size:8px; font-weight:700; color:var(--accent); margin-left:2px; cursor:help; vertical-align:super; }
+  .status-pill{ font-size:10px; font-weight:700; padding:3px 8px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
+  .status-pill.done{ background:var(--done-bg); color:var(--done-fg); }
+  .status-pill.pending{ background:var(--pending-bg); color:var(--pending-fg); }
+  .ts-type{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:999px; background:var(--auto-bg); color:var(--auto-fg); margin-left:4px; }
+  .ts-meta{ font-size:9.5px; color:var(--text-faint); margin-top:2px; }
+  .empty-bucket, .empty-state{ padding:24px; text-align:center; color:var(--text-faint); font-size:12.5px; }
+
+  .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; margin-bottom:14px; }
+  .card h2{ font-size:14px; margin-bottom:10px; }
+  .card-head-row{ display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+  .card-head-row .btn-download-sm{ margin-left:auto; border:1px solid var(--border); font-weight:600; }
+
+  table.simple{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.simple th{ text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-faint); font-weight:600; padding:7px 10px; border-bottom:1px solid var(--border); }
+  table.simple td{ padding:8px 10px; border-bottom:1px solid var(--border); }
+  table.simple tr.total-row td{ font-weight:700; border-top:2px solid var(--border); border-bottom:none; background:var(--surface-2); }
+  .rate-bar{ height:6px; border-radius:4px; background:var(--surface-2); overflow:hidden; width:70px; display:inline-block; vertical-align:middle; margin-right:6px; }
+  .rate-bar > div{ height:100%; background:var(--accent); }
+
+  .movement-grid-wrap{ overflow-x:auto; }
+  table.movement{ border-collapse:collapse; font-size:12px; width:100%; }
+  table.movement th, table.movement td{ padding:7px 10px; border-bottom:1px solid var(--border); white-space:nowrap; text-align:left; }
+  table.movement th{ font-size:10px; text-transform:uppercase; color:var(--text-faint); font-weight:600; }
+  table.movement .daycol{ text-align:center; }
+
+  .change-item{ display:flex; justify-content:space-between; padding:8px 10px; border-bottom:1px solid var(--border); font-size:12.5px; }
+  .change-item:last-child{ border-bottom:none; }
+  .tag-added{ color:var(--up-fg); font-weight:600; font-size:10.5px; }
+  .tag-removed{ color:var(--down-fg); font-weight:600; font-size:10.5px; }
+
+  .row[data-id]{ cursor:pointer; }
+  .row[data-id]:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+
+  .scrim{ position:fixed; inset:0; background:rgba(10,11,16,.45); display:flex; align-items:flex-start; justify-content:center; padding:5vh 16px; z-index:50; overflow-y:auto; }
+  .scrim[hidden]{ display:none; }
+  .panel{ background:var(--surface); border:1px solid var(--border); border-radius:16px; width:100%; max-width:480px; padding:20px; box-shadow:0 20px 60px rgba(0,0,0,.3); margin-bottom:5vh; }
+  .panel h2{ font-size:16px; margin:0 0 6px; }
+  .detail-meta{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:14px; font-size:11.5px; color:var(--text-faint); }
+  .detail-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px 16px; }
+  .detail-grid label{ display:block; font-size:10px; font-weight:600; text-transform:uppercase; letter-spacing:.03em; color:var(--text-faint); margin-bottom:3px; }
+  .detail-grid > div{ font-size:12.8px; }
+  .field{ margin-bottom:0; }
+  .field label{ display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.03em; }
+  .panel-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .btn-ghost{ background:none; border:1px solid var(--border); border-radius:9px; padding:9px 14px; font-size:13px; font-weight:600; color:var(--text-muted); }
+  .btn-ghost:hover{ background:var(--surface-2); }
+
+  @media (max-width:980px){
+    .layout{ grid-template-columns:1fr; }
+    .sidebar{ position:static; max-height:none; }
+    .row-head{ display:none; }
+    .row{ grid-template-columns:1fr; gap:4px; padding:12px 14px; }
+    .row > div::before{ content: attr(data-label); font-size:9.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--text-faint); display:block; margin-bottom:1px; }
+    .row .seller::before, .row .sid::before{ display:none; }
+    .stats{ grid-template-columns:repeat(2,1fr); }
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none"><path d="M4 12l5 5L20 6" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div>
+        <h1>TS Priority Queue</h1>
+        <div class="sub" id="scopeLabel">Loading…</div>
+      </div>
+    </div>
+    <span class="asof-pill" id="asofPill">—</span>
+    <button class="theme-btn" id="themeBtn" title="Toggle theme">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" id="themeIcon"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button data-t="queue" class="active">Priority Queue</button>
+    <button data-t="compliance">Compliance</button>
+    <button data-t="movement">RTO / PNL Movement</button>
+    <button data-t="roster">Roster Changes</button>
+  </div>
+
+  <div id="loadingState" class="empty-state">Connecting to live data…</div>
+  <div id="appRoot" hidden></div>
+</div>
+
+<script>
+const BUCKET_ORDER = ["zero_gmv","objective_hit","potential","breakeven_potential","bucket_health","rest_ts_pending"];
+const BUCKET_META = {
+  zero_gmv: {label:"Zero GMV (Monday Task)", desc:"W1 spend >₹1,000 but zero orders — mandatory Monday troubleshoot task", color:"var(--b-zerogmv)", deadline:"Monday only", isZeroGmv:true},
+  objective_hit: {label:"Objective Hit", desc:"W1 & W2 both ≥3k spend, ≥5% PNL — sustained profitability", color:"var(--b-objective)", deadline:"Till Tuesday"},
+  potential: {label:"Potential (Profitable >5%)", desc:"W1 ≥3k spend, ≥5% PNL", color:"var(--b-potential)", deadline:"Till Tuesday"},
+  breakeven_potential: {label:"Breakeven Potential", desc:"W1 ≥3k spend, ≥0% PNL", color:"var(--b-breakeven)", deadline:"Till Tuesday"},
+  bucket_health: {label:"Bucket Health", desc:"W1 ≥3k spend, ≥-20% PNL", color:"var(--b-health)", deadline:"Till Wednesday"},
+  rest_ts_pending: {label:"Rest TS Pending", desc:"Eligible via last-7-day spend, but W1 PNL below -20%", color:"var(--b-pending)", deadline:null},
+};
+const WEEKDAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
+function escapeHtml(s){ return (s==null?"":String(s)).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function fmtMoney(n){ if(n==null) return "—"; return "₹" + Math.round(n).toLocaleString("en-IN"); }
+function fmtPct(n){ if(n==null) return null; return (n>0?"+":"") + n.toFixed(1) + "%"; }
+function fmtDateLabel(iso){
+  const d = new Date(iso+"T00:00:00");
+  return WEEKDAY_NAMES[d.getDay()] + " " + d.toLocaleDateString(undefined,{month:"short", day:"numeric"});
+}
+function slugify(s){ return (s||"").trim().toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-+|-+$/g,""); }
+
+// ---------- CSV download (plain Blob + <a download> — this is a real site,
+// not a sandboxed artifact, so an ordinary browser download works directly) ----------
+function csvEscape(v){
+  if(v == null) return "";
+  const s = String(v);
+  return /[",\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+}
+function rowsToCsv(rows, cols){
+  const header = cols.map(c=>csvEscape(c.label)).join(",");
+  const lines = rows.map(r=> cols.map(c=>{
+    let v = r[c.key];
+    if(typeof v === "boolean") v = v ? "Yes" : "No";
+    return csvEscape(v);
+  }).join(","));
+  // leading BOM so Excel opens UTF-8 (₹ etc.) correctly instead of guessing the wrong encoding
+  return "﻿" + [header, ...lines].join("\r\n");
+}
+function downloadCsv(filename, rows, cols){
+  if(!rows.length){
+    flashDownloadStatus("Nothing to download for the current filter.");
+    return;
+  }
+  const csv = rowsToCsv(rows, cols);
+  const blob = new Blob([csv], {type: "text/csv;charset=utf-8;"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 2000);
+  flashDownloadStatus(`Downloaded ${filename}`);
+}
+function flashDownloadStatus(msg){
+  let el = document.getElementById("dlStatusToast");
+  if(!el){
+    el = document.createElement("div");
+    el.id = "dlStatusToast";
+    el.className = "dl-toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.hidden = false;
+  clearTimeout(el._t);
+  el._t = setTimeout(()=>{ el.hidden = true; }, 6000);
+}
+
+// ---------- theme ----------
+function applyTheme(pref){
+  const root = document.documentElement;
+  if(pref==="light") root.setAttribute("data-theme","light");
+  else if(pref==="dark") root.setAttribute("data-theme","dark");
+  else root.removeAttribute("data-theme");
+}
+function cycleTheme(){
+  let pref = "system";
+  try{ pref = localStorage.getItem("ts_theme_pref") || "system"; }catch(e){}
+  const next = pref==="system" ? "light" : pref==="light" ? "dark" : "system";
+  try{ localStorage.setItem("ts_theme_pref", next); }catch(e){}
+  applyTheme(next);
+  document.getElementById("themeBtn").title = "Theme: " + next;
+}
+(function initTheme(){
+  let pref = "system";
+  try{ pref = localStorage.getItem("ts_theme_pref") || "system"; }catch(e){}
+  applyTheme(pref);
+})();
+document.getElementById("themeBtn").onclick = cycleTheme;
+
+// ---------- state ----------
+let SELLERS = [];
+let COMPLIANCE_WEEKS = {};   // weekKey -> doc
+let ROSTER_CHANGES = {};     // date -> doc
+let GM_LIST = [];
+let db = null;
+
+let state = {
+  tab: "queue",
+  scope: "eligible", tsStatus: "pending", gm: null, q: "",
+  collapsed: {},
+  sort: { field: "w1Pnl", dir: "asc" },
+  complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
+  moveWeek: null, moveGm: null, moveQ: "", moveSort: { field: "name", dir: "asc" },
+};
+
+function sortRows(rows, field, dir, accessor){
+  const mul = dir === "desc" ? -1 : 1;
+  return rows.slice().sort((a,b)=>{
+    let av = accessor ? accessor(a, field) : a[field];
+    let bv = accessor ? accessor(b, field) : b[field];
+    if(av == null && bv == null) return 0;
+    if(av == null) return 1;   // nulls always sort last, regardless of direction
+    if(bv == null) return -1;
+    if(typeof av === "boolean") { av = av?1:0; bv = bv?1:0; }
+    if(typeof av === "string") return av.localeCompare(bv) * mul;
+    return (av - bv) * mul;
+  });
+}
+function sortArrow(field, current){
+  if(current.field !== field) return "";
+  return current.dir === "asc" ? " ▲" : " ▼";
+}
+
+let LAST_REFRESH = null;
+
+function flattenSnapshot(gmDocs){
+  const sellers = [];
+  const gms = new Set();
+  let latest = null;
+  gmDocs.forEach(doc=>{
+    const d = doc.data();
+    if(!d) return;
+    gms.add(d.gm);
+    (d.sellers||[]).forEach(s=> sellers.push(s));
+    if(d.updatedAt && (!latest || d.updatedAt > latest)) latest = d.updatedAt;
+  });
+  SELLERS = sellers;
+  GM_LIST = [...gms].sort((a,b)=>a.localeCompare(b));
+  LAST_REFRESH = latest;
+}
+
+function renderShell(){
+  document.getElementById("loadingState").hidden = true;
+  document.getElementById("appRoot").hidden = false;
+  const totalElig = SELLERS.filter(s=>s.eligible).length;
+  document.getElementById("scopeLabel").textContent = `${GM_LIST.length} GMs · ${SELLERS.length} sellers · ${totalElig} eligible this week`;
+  const pill = document.getElementById("asofPill");
+  if(LAST_REFRESH){
+    const d = new Date(LAST_REFRESH);
+    const ageHours = (Date.now() - d.getTime()) / 3600000;
+    const label = "Data as of " + d.toLocaleString(undefined, {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
+    pill.textContent = ageHours > 30 ? label + " — STALE, refresh overdue" : label;
+    pill.style.color = ageHours > 30 ? "var(--down-fg)" : "";
+    pill.style.borderColor = ageHours > 30 ? "var(--down-fg)" : "";
+  } else {
+    pill.textContent = "Live data";
+  }
+  renderTab();
+}
+
+// Single delegated click handler on the stable #appRoot container. Rows, bucket
+// headers, GM filters, and sort headers are all recreated on every live-data
+// refresh, so binding listeners directly to them is fragile: a background
+// onSnapshot re-render landing between mousedown and mouseup silently drops
+// the click. Delegating to #appRoot (which itself is never replaced, only its
+// contents) makes every one of these interactive regardless of render timing.
+document.getElementById("appRoot").addEventListener("click", e=>{
+  const rowEl = e.target.closest(".row[data-id]");
+  if(rowEl){ openSellerDetail(rowEl.dataset.id); return; }
+
+  const sortEl = e.target.closest("[data-sort]");
+  if(sortEl){
+    const field = sortEl.dataset.sort;
+    const sortState = state.tab === "movement" ? state.moveSort : state.tab === "compliance" ? state.complianceSort : state.sort;
+    if(sortState.field === field) sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
+    else { sortState.field = field; sortState.dir = field==="name" || field==="gm" ? "asc" : "desc"; }
+    if(state.tab==="queue") renderBuckets();
+    else if(state.tab==="compliance") renderCompliance();
+    else if(state.tab==="movement") renderMovementTable();
+    return;
+  }
+
+  const dlBucketEl = e.target.closest("[data-download-bucket]");
+  if(dlBucketEl){
+    const bk = dlBucketEl.dataset.downloadBucket;
+    const bkMeta = BUCKET_META[bk];
+    const bkPred = bkMeta.isZeroGmv ? (s=>s.zeroGmv && s.zeroGmv.isZeroGmv) : (s=>s.bucket===bk);
+    const rows = sortRows(SELLERS.filter(s=>passesFilter(s) && bkPred(s)), state.sort.field, state.sort.dir);
+    const cols = [
+      {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"company",label:"Company"},
+      {key:"gm",label:"GM"}, {key:"gc",label:"GC"}, {key:"bestSource",label:"Source"},
+      {key:"w1Spend",label:"W1 Spend"}, {key:"w1Pnl",label:"W1 PNL %"}, {key:"w2Spend",label:"W2 Spend"},
+      {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"}, {key:"l7dMetaSpend",label:"L7D Meta Spend"},
+      {key:"tsDone",label:"TS Done"}, {key:"tsType",label:"TS Type"}, {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"},
+    ];
+    const namePart = state.gm ? state.gm.replace(/\s+/g,"_") : "All_GMs";
+    downloadCsv(`${bk}_${namePart}.csv`, rows, cols);
+    return;
+  }
+
+  const bucketHeadEl = e.target.closest(".bucket-head");
+  if(bucketHeadEl){
+    const bucket = bucketHeadEl.closest(".bucket");
+    const bk = bucket.dataset.bucket;
+    state.collapsed[bk] = !state.collapsed[bk];
+    bucket.classList.toggle("collapsed", state.collapsed[bk]);
+    return;
+  }
+
+  const gmRowEl = e.target.closest(".gm-row");
+  if(gmRowEl){
+    state.gm = (gmRowEl.dataset.gm==="__all__") ? null : (state.gm===gmRowEl.dataset.gm ? null : gmRowEl.dataset.gm);
+    renderTab();
+    return;
+  }
+
+  const bucketCellEl = e.target.closest("[data-bucket-cell]");
+  if(bucketCellEl){
+    openBucketList(bucketCellEl.dataset.gmName, bucketCellEl.dataset.bucketCell);
+    return;
+  }
+
+  const dlEl = e.target.closest("[data-download]");
+  if(dlEl){
+    const kind = dlEl.dataset.download;
+    if(kind === "compliance-leaderboard"){
+      const rows = window._complianceRowsForExport || [];
+      downloadCsv(`compliance_by_gm_${state.complianceWeek||"week"}.csv`, rows, [
+        {key:"gm",label:"GM"},{key:"eligible",label:"Eligible"},{key:"done",label:"Done"},{key:"doneManual",label:"Manual"},{key:"doneAuto",label:"Auto"},{key:"pending",label:"Pending"},{key:"rate",label:"Compliance %"},
+      ]);
+    } else if(kind === "zero-gmv-compliance"){
+      const rows = window._zeroGmvRowsForExport || [];
+      downloadCsv(`zero_gmv_compliance_${state.complianceWeek||"week"}.csv`, rows, [
+        {key:"gm",label:"GM"},{key:"eligible",label:"Eligible"},{key:"done",label:"Done"},{key:"doneManual",label:"Manual"},{key:"doneAuto",label:"Auto"},{key:"pending",label:"Pending"},{key:"rate",label:"Compliance %"},
+      ]);
+    } else if(kind === "bucket-breakdown"){
+      const rows = (window._breakdownRowsForExport||[]).map(r=>({gm:r.gm, ...Object.fromEntries(BREAKDOWN_BUCKETS.map(bk=>[bk, r.counts[bk]||0]))}));
+      downloadCsv(`bucket_totals_by_gm.csv`, rows, [
+        {key:"gm",label:"GM"}, ...BREAKDOWN_BUCKETS.map(bk=>({key:bk, label:BUCKET_META[bk].label})),
+      ]);
+    } else if(kind === "movement"){
+      const rows = window._movementRowsForExport || [];
+      const cols = window._movementColsForExport || [];
+      downloadCsv(`rto_pnl_movement_${state.moveWeek||"week"}.csv`, rows, cols);
+    } else if(kind === "roster-changes"){
+      const rows = window._rosterRowsForExport || [];
+      downloadCsv(`roster_changes.csv`, rows, [
+        {key:"changeType",label:"Change"},{key:"weekOf",label:"Week Of"},{key:"name",label:"Seller Name"},{key:"id",label:"Seller ID"},{key:"gm",label:"GM"},
+      ]);
+    } else if(kind === "bucket-list"){
+      const rows = window._bucketListForExport || [];
+      downloadCsv(`${dlEl.dataset.bucketKey||"bucket"}_list.csv`, rows, [
+        {key:"id",label:"Seller ID"},{key:"name",label:"Seller Name"},{key:"gm",label:"GM"},
+      ]);
+    }
+    return;
+  }
+});
+document.getElementById("appRoot").addEventListener("keydown", e=>{
+  if(e.key!=="Enter" && e.key!==" ") return;
+  const rowEl = e.target.closest(".row[data-id]");
+  if(rowEl){ e.preventDefault(); openSellerDetail(rowEl.dataset.id); }
+});
+
+document.getElementById("tabs").addEventListener("click", e=>{
+  const b = e.target.closest("button"); if(!b) return;
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("active"));
+  b.classList.add("active");
+  state.tab = b.dataset.t;
+  renderTab();
+});
+
+function renderTab(){
+  const root = document.getElementById("appRoot");
+  if(state.tab==="queue") root.innerHTML = queueTemplate();
+  else if(state.tab==="compliance") root.innerHTML = complianceTemplate();
+  else if(state.tab==="movement") root.innerHTML = movementTemplate();
+  else if(state.tab==="roster") root.innerHTML = rosterTemplate();
+  wireTab();
+}
+
+// ================= QUEUE TAB =================
+function queueTemplate(){
+  return `
+    <div class="caveat" id="caveatBox">
+      <button class="x" id="caveatClose">&times;</button>
+      <b>How to read this:</b> PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
+      RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log.
+      <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Its current cohort is the most recent one available; this week's batch appears here once it's created.
+    </div>
+    <div class="stats" id="statsRow"></div>
+    <div class="controls">
+      <div class="seg" id="scopeSeg">
+        <button data-v="eligible" class="${state.scope==='eligible'?'active':''}">Eligible only</button>
+        <button data-v="all" class="${state.scope==='all'?'active':''}">Full roster</button>
+      </div>
+      <div class="seg" id="statusSeg">
+        <button data-v="all" class="${state.tsStatus==='all'?'active':''}">Any status</button>
+        <button data-v="pending" class="${state.tsStatus==='pending'?'active':''}">Pending TS</button>
+        <button data-v="done" class="${state.tsStatus==='done'?'active':''}">Done</button>
+      </div>
+      <input class="search" id="searchBox" type="text" placeholder="Search seller, ID, or company…" value="${escapeHtml(state.q)}">
+      <button class="btn-download" id="downloadQueueBtn" title="Download the currently filtered view as CSV">⬇ CSV</button>
+    </div>
+    <div class="layout">
+      <div class="sidebar">
+        <h3>Filter by GM</h3>
+        <input class="gm-search" id="gmSearch" type="text" placeholder="Search GM…">
+        <div id="gmList"></div>
+      </div>
+      <div id="buckets"></div>
+    </div>
+  `;
+}
+
+function passesFilter(s){
+  if(state.gm && s.gm !== state.gm) return false;
+  if(state.q){
+    const q = state.q.toLowerCase();
+    if(!(s.name.toLowerCase().includes(q) || (s.company||"").toLowerCase().includes(q) || s.id.toLowerCase().includes(q))) return false;
+  }
+  const isZeroGmv = s.zeroGmv && s.zeroGmv.isZeroGmv;
+  if(state.scope==="eligible" && !s.eligible && !isZeroGmv) return false;
+  if(state.tsStatus==="pending" && s.tsDone) return false;
+  if(state.tsStatus==="done" && !s.tsDone) return false;
+  return true;
+}
+
+function renderQueueStats(){
+  const scoped = state.gm ? SELLERS.filter(s=>s.gm===state.gm) : SELLERS;
+  const eligible = scoped.filter(s=>s.eligible);
+  const done = eligible.filter(s=>s.tsDone);
+  const doneManual = done.filter(s=>s.tsType==="manual_ts").length;
+  const doneAuto = done.filter(s=>s.tsType==="auto_ts").length;
+  const rate = eligible.length ? Math.round(done.length/eligible.length*100) : 0;
+  const tiles = [
+    {n:eligible.length, l:"Eligible for TS", cap: state.gm || "All GMs"},
+    {n:done.length, l:"TS Done", cap: `${doneManual} manual · ${doneAuto} auto`},
+    {n:eligible.length-done.length, l:"TS Pending"},
+    {n:rate+"%", l:"Completion rate"},
+  ];
+  const el = document.getElementById("statsRow");
+  if(el) el.innerHTML = tiles.map(t=>`<div class="stat-tile"><div class="n mono">${t.n}</div><div class="l">${t.l}</div>${t.cap?`<div class="cap">${t.cap}</div>`:""}</div>`).join("");
+}
+
+function renderGmSidebar(){
+  const el = document.getElementById("gmList");
+  if(!el) return;
+  const q = (document.getElementById("gmSearch").value||"").toLowerCase();
+  const list = GM_LIST.filter(g=>g.toLowerCase().includes(q));
+  const totalPending = SELLERS.filter(s=>s.eligible && !s.tsDone).length;
+  const overallRow = `<button class="gm-row overall-row ${!state.gm?'active':''}" data-gm="__all__">
+      <span class="name">All GMs (Overall)</span><span class="badge">${totalPending||""}</span>
+    </button>`;
+  el.innerHTML = overallRow + list.map(g=>{
+    const pending = SELLERS.filter(s=>s.gm===g && s.eligible && !s.tsDone).length;
+    return `<button class="gm-row ${state.gm===g?'active':''}" data-gm="${escapeHtml(g)}">
+      <span class="name">${escapeHtml(g)}</span><span class="badge">${pending||""}</span>
+    </button>`;
+  }).join("");
+}
+
+// Spend: >=3000 green, 1-2999 yellow, 0 red. PNL: needs its OWN week's spend
+// >=3000 to be judged on its own merit (>=5 green, >0 yellow, else red);
+// below that spend threshold, PNL is always shown red regardless of value.
+function spendColorClass(spend){
+  if(spend == null) return "";
+  if(spend >= 3000) return "clr-green";
+  if(spend > 0) return "clr-yellow";
+  return "clr-red";
+}
+function pnlColorClass(pnl, spend){
+  if(pnl == null) return "";
+  if(spend == null || spend < 3000) return "clr-red";
+  if(pnl >= 5) return "clr-green";
+  if(pnl > 0) return "clr-yellow";
+  return "clr-red";
+}
+function spendCellHtml(spend){
+  if(spend == null) return '<span class="na">—</span>';
+  return `<span class="mono ${spendColorClass(spend)}">${fmtMoney(spend)}</span>`;
+}
+function pnlCellHtml(pnl, spend, oldPnl){
+  if(pnl == null) return '<span class="na">n/a</span>';
+  let arrowHtml = "";
+  if(oldPnl != null){
+    const delta = pnl - oldPnl;
+    const dir = delta > 0.05 ? "up" : delta < -0.05 ? "down" : "flat";
+    arrowHtml = (dir==="up"?"▲":dir==="down"?"▼":"•") + " ";
+  }
+  return `<span class="mono ${pnlColorClass(pnl, spend)}">${arrowHtml}${pnl.toFixed(1)}%</span>`;
+}
+
+// RTO is the one metric where "up" is bad: a spike means more returns, so it
+// colors opposite to how PNL/spend trends color (up=red, down=green).
+function rtoTrendHtml(oldV, newV){
+  if(newV==null) return '<span class="na">n/a</span>';
+  if(oldV==null) return `<span class="mono">${newV.toFixed(2)}%</span>`;
+  const delta = newV - oldV;
+  const dir = delta > 0.05 ? "up" : delta < -0.05 ? "down" : "flat";
+  const arrow = dir==="up" ? "▲" : dir==="down" ? "▼" : "•";
+  const cls = dir==="up" ? "clr-red" : dir==="down" ? "clr-green" : "";
+  return `<span class="${cls} mono">${arrow} ${newV.toFixed(2)}%</span>`;
+}
+
+function rowHtml(s){
+  const statusHtml = s.tsDone
+    ? `<span class="status-pill done">Done${s.tsType==='auto_ts'?'<span class="ts-type">AUTO</span>':''}</span><div class="ts-meta">${escapeHtml(s.tsType==='manual_ts'?(s.tsBy||''):'Hitesh Agarwal')} · ${s.tsDate||''}</div>`
+    : `<span class="status-pill pending">Pending</span>`;
+  return `<div class="row" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
+    <div class="seller" data-label="Seller">${escapeHtml(s.name)}<div class="sid">${escapeHtml(s.id)}</div></div>
+    <div data-label="GM">${escapeHtml(s.gm)}</div>
+    <div data-label="GC">${escapeHtml(s.gc||'—')}</div>
+    <div data-label="Source"><span class="src-tag">${escapeHtml(s.bestSource)}</span></div>
+    <div data-label="W1 Spend">${spendCellHtml(s.w1Spend)}</div>
+    <div data-label="W1 PNL">${pnlCellHtml(s.w1Pnl, s.w1Spend, s.w2Pnl)}</div>
+    <div data-label="W2 Spend">${spendCellHtml(s.w2Spend)}</div>
+    <div data-label="W2 PNL">${pnlCellHtml(s.w2Pnl, s.w2Spend, s.w3Pnl)}</div>
+    <div data-label="RTO (W1)">${rtoTrendHtml(s.rtoW2, s.rtoW1)}${s.rtoSource==='facebook_proxy'?'<sup class="rto-src" title="RTO taken from Facebook data as a proxy — this seller\'s best source is new_pnl, which doesn\'t expose RTO in bulk yet">FB</sup>':''}</div>
+    <div data-label="L7D Meta">${spendCellHtml(s.l7dMetaSpend)}</div>
+    <div data-label="TS Status">${statusHtml}</div>
+  </div>`;
+}
+
+const QUEUE_SORT_COLS = [
+  {key:"name", label:"Seller"}, {key:"gm", label:"GM"}, {key:"gc", label:"GC"}, {key:"bestSource", label:"Source"},
+  {key:"w1Spend", label:"W1 Spend"}, {key:"w1Pnl", label:"W1 PNL"}, {key:"w2Spend", label:"W2 Spend"}, {key:"w2Pnl", label:"W2 PNL"},
+  {key:"rtoW1", label:"RTO (W1)"}, {key:"l7dMetaSpend", label:"L7D Meta"}, {key:"tsDone", label:"TS Status"},
+];
+function queueRowHeadHtml(){
+  return `<div class="row-head">${QUEUE_SORT_COLS.map(c=>
+    `<div data-sort="${c.key}" class="sortable">${c.label}${sortArrow(c.key, state.sort)}</div>`
+  ).join("")}</div>`;
+}
+
+function renderBuckets(){
+  const el = document.getElementById("buckets");
+  if(!el) return;
+  const filtered = SELLERS.filter(passesFilter);
+  el.innerHTML = BUCKET_ORDER.map(bk=>{
+    const meta = BUCKET_META[bk];
+    const unsorted = meta.isZeroGmv
+      ? filtered.filter(s=>s.zeroGmv && s.zeroGmv.isZeroGmv)
+      : filtered.filter(s=>s.bucket===bk);
+    const rows = sortRows(unsorted, state.sort.field, state.sort.dir);
+    const collapsed = state.collapsed[bk] ? "collapsed" : "";
+    return `<div class="bucket ${collapsed}" data-bucket="${bk}">
+      <div class="bucket-head">
+        <div class="stripe" style="background:${meta.color}"></div>
+        <div><div class="title">${meta.label} <span class="count">(${rows.length})</span></div><div class="desc">${meta.desc}</div></div>
+        ${meta.deadline ? `<span class="tue-tag">${meta.deadline}</span>` : ''}
+        ${rows.length ? `<button class="btn-download-sm" data-download-bucket="${bk}" title="Download this bucket as CSV">⬇</button>` : ''}
+        <span class="chev">▾</span>
+      </div>
+      <div class="bucket-body">
+        ${rows.length ? queueRowHeadHtml() + rows.map(rowHtml).join("") : `<div class="empty-bucket">No sellers in this bucket for the current filter.</div>`}
+      </div>
+    </div>`;
+  }).join("");
+}
+
+// ================= SELLER DETAIL MODAL =================
+const detailScrim = document.createElement("div");
+detailScrim.className = "scrim"; detailScrim.hidden = true;
+document.body.appendChild(detailScrim);
+
+function closeDetail(){ detailScrim.hidden = true; detailScrim.innerHTML = ""; }
+detailScrim.addEventListener("click", e=>{ if(e.target===detailScrim) closeDetail(); });
+
+function moneyOrDash(n){ return n==null ? "—" : fmtMoney(n); }
+function pctOrDash(n){ return n==null ? "—" : n.toFixed(1)+"%"; }
+
+function movementRowsHtml(s){
+  const keys = Object.keys(s.movement||{}).sort().reverse();
+  if(!keys.length) return `<div class="na">No movement history tracked yet for this seller.</div>`;
+  return `<table class="movement" style="width:100%;">
+    <thead><tr><th>Tracked week</th><th>Date</th><th>RTO%</th><th>PNL%</th><th>Spend</th></tr></thead>
+    <tbody>
+      ${keys.map(k=> s.movement[k].map(o=>`<tr>
+        <td class="mono">${escapeHtml(k)}</td><td class="mono">${escapeHtml(o.date)}</td>
+        <td class="mono">${o.rto!=null?o.rto.toFixed(2):'—'}</td>
+        <td class="mono">${o.pnl!=null?o.pnl.toFixed(1)+'%':'—'}</td>
+        <td class="mono">${o.spend!=null?fmtMoney(o.spend):'—'}</td>
+      </tr>`).join("")).join("")}
+    </tbody>
+  </table>`;
+}
+
+function openSellerDetail(id){
+  const s = SELLERS.find(x=>x.id===id);
+  if(!s) return;
+  const bm = BUCKET_META[s.bucket];
+  const statusHtml = s.tsDone
+    ? `<span class="status-pill done">Done${s.tsType==='auto_ts'?'<span class="ts-type">AUTO</span>':''}</span>
+       <div class="ts-meta">by ${escapeHtml(s.tsType==='manual_ts'?(s.tsBy||''):'Hitesh Agarwal')} on ${escapeHtml(s.tsDate||'')}</div>`
+    : `<span class="status-pill pending">Pending</span>`;
+  detailScrim.innerHTML = `
+    <div class="panel" style="max-width:640px;">
+      <h2>${escapeHtml(s.name)}</h2>
+      <div class="detail-meta">
+        <span class="sid mono">${escapeHtml(s.id)}</span><span>·</span>
+        <span>${escapeHtml(s.company||'')}</span>
+      </div>
+      <div class="detail-grid">
+        <div><label>GM</label><div>${escapeHtml(s.gm)}</div></div>
+        <div><label>GC</label><div>${escapeHtml(s.gc||'—')}</div></div>
+        <div><label>Best source</label><div><span class="src-tag">${escapeHtml(s.bestSource)}</span></div></div>
+        <div><label>Bucket</label><div>${bm?`<span class="status-pill" style="background:${bm.color};color:#fff;">${bm.label}</span>${bm.deadline?` <span class="ts-meta">${bm.deadline}</span>`:''}`:'<span class="na">none</span>'}</div></div>
+        <div><label>W1 Spend</label><div>${spendCellHtml(s.w1Spend)}</div></div>
+        <div><label>W1 PNL</label><div>${pnlCellHtml(s.w1Pnl, s.w1Spend)}</div></div>
+        <div><label>W2 Spend</label><div>${spendCellHtml(s.w2Spend)}</div></div>
+        <div><label>W2 PNL</label><div>${pnlCellHtml(s.w2Pnl, s.w2Spend)}</div></div>
+        <div><label>W3 PNL</label><div class="mono">${pctOrDash(s.w3Pnl)}</div></div>
+        <div><label>RTO W1${s.rtoSource==='facebook_proxy'?' <span class="ts-meta">(via Facebook proxy)</span>':''}</label><div class="mono">${s.rtoW1!=null?s.rtoW1.toFixed(2)+'%':'—'}</div></div>
+        <div><label>RTO W2</label><div class="mono">${s.rtoW2!=null?s.rtoW2.toFixed(2)+'%':'—'}</div></div>
+        <div><label>L7D Meta spend</label><div>${spendCellHtml(s.l7dMetaSpend)}</div></div>
+        <div><label>Eligible via</label><div>${s.eligibleViaW1?'<span class="status-pill done">W1</span>':''} ${s.eligibleViaL7d?'<span class="status-pill done">L7D</span>':''}${(s.zeroGmv&&s.zeroGmv.isZeroGmv)?'<span class="status-pill" style="background:var(--b-zerogmv);color:#fff;">Zero GMV</span>':''}${(!s.eligibleViaW1&&!s.eligibleViaL7d&&!(s.zeroGmv&&s.zeroGmv.isZeroGmv))?'<span class="na">not eligible</span>':''}</div></div>
+        ${(s.zeroGmv&&s.zeroGmv.isZeroGmv) ? `<div><label>Zero GMV task scheduled</label><div class="mono" style="font-size:12px;">${escapeHtml((s.zeroGmv.scheduledAt||'').replace('T',' ').slice(0,16))}</div></div>` : ''}
+        <div><label>TS status</label><div>${statusHtml}</div></div>
+      </div>
+      <div class="field" style="margin-top:14px;">
+        <label>RTO / PNL movement history</label>
+        <div class="movement-grid-wrap">${movementRowsHtml(s)}</div>
+      </div>
+      <div class="panel-actions">
+        <button class="btn-ghost" id="closeDetailBtn">Close</button>
+      </div>
+    </div>
+  `;
+  detailScrim.hidden = false;
+  document.getElementById("closeDetailBtn").onclick = closeDetail;
+}
+
+function wireQueueTab(){
+  renderQueueStats();
+  renderGmSidebar();
+  renderBuckets();
+  const scopeSeg = document.getElementById("scopeSeg");
+  if(scopeSeg) scopeSeg.addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    document.querySelectorAll("#scopeSeg button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    state.scope = b.dataset.v;
+    renderBuckets();
+    renderGmSidebar();
+  });
+  const statusSeg = document.getElementById("statusSeg");
+  if(statusSeg) statusSeg.addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    document.querySelectorAll("#statusSeg button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    state.tsStatus = b.dataset.v;
+    renderBuckets();
+    renderGmSidebar();
+  });
+  const search = document.getElementById("searchBox");
+  if(search) search.addEventListener("input", e=>{ state.q = e.target.value; renderBuckets(); });
+  const gmSearch = document.getElementById("gmSearch");
+  if(gmSearch) gmSearch.addEventListener("input", renderGmSidebar);
+  const caveatClose = document.getElementById("caveatClose");
+  if(caveatClose){
+    try{ if(localStorage.getItem("ts_caveat_dismissed")==="1") document.getElementById("caveatBox").style.display="none"; }catch(e){}
+    caveatClose.onclick = ()=>{ document.getElementById("caveatBox").style.display="none"; try{ localStorage.setItem("ts_caveat_dismissed","1"); }catch(e){} };
+  }
+  const dlBtn = document.getElementById("downloadQueueBtn");
+  if(dlBtn) dlBtn.onclick = ()=>{
+    const rows = SELLERS.filter(passesFilter);
+    const cols = [
+      {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"company",label:"Company"},
+      {key:"gm",label:"GM"}, {key:"gc",label:"GC"}, {key:"bestSource",label:"Source"},
+      {key:"bucket",label:"Bucket"}, {key:"w1Spend",label:"W1 Spend"}, {key:"w1Pnl",label:"W1 PNL %"},
+      {key:"w2Spend",label:"W2 Spend"}, {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"},
+      {key:"l7dMetaSpend",label:"L7D Meta Spend"}, {key:"tsDone",label:"TS Done"}, {key:"tsType",label:"TS Type"},
+      {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"},
+    ];
+    const namePart = state.gm ? state.gm.replace(/\s+/g,"_") : "All_GMs";
+    downloadCsv(`ts_priority_queue_${namePart}_${state.tsStatus}.csv`, rows, cols);
+  };
+}
+
+// ================= COMPLIANCE TAB =================
+function complianceTemplate(){
+  const weekKeys = Object.keys(COMPLIANCE_WEEKS).sort();
+  if(!state.complianceWeek || !COMPLIANCE_WEEKS[state.complianceWeek]) state.complianceWeek = weekKeys[weekKeys.length-1];
+  const opts = weekKeys.map(k=>`<option value="${k}" ${k===state.complianceWeek?'selected':''}>${escapeHtml(COMPLIANCE_WEEKS[k].weekLabel)} (${escapeHtml(COMPLIANCE_WEEKS[k].dateRange)})</option>`).join("");
+  return `
+    <div class="controls">
+      <label class="mono" style="font-size:11px;color:var(--text-faint);">Week:</label>
+      <select class="field" id="complianceWeekSel">${opts || '<option>No data yet</option>'}</select>
+    </div>
+    <div id="complianceBody"></div>
+  `;
+}
+
+const COMPLIANCE_SORT_COLS = [
+  {key:"gm", label:"GM"}, {key:"eligible", label:"Eligible"}, {key:"done", label:"Done"},
+  {key:"doneManual", label:"Manual"}, {key:"doneAuto", label:"Auto"},
+  {key:"pending", label:"Pending"}, {key:"rate", label:"Compliance"},
+];
+const BREAKDOWN_BUCKETS = ["objective_hit","potential","breakeven_potential","bucket_health","rest_ts_pending"];
+
+function renderCompliance(){
+  const body = document.getElementById("complianceBody");
+  if(!body) return;
+  const doc = COMPLIANCE_WEEKS[state.complianceWeek];
+  if(!doc){ body.innerHTML = `<div class="empty-state">No compliance data recorded yet.</div>`; return; }
+  let rows = Object.values(doc.byGM||{}).map(g=>({...g, doneManual: g.doneManual||0, doneAuto: g.doneAuto||0, pending: g.eligible-g.done, rate: g.eligible? Math.round(g.done/g.eligible*100):0}));
+  rows = sortRows(rows, state.complianceSort.field, state.complianceSort.dir);
+  const overallRate = doc.totalEligible ? Math.round(doc.totalDone/doc.totalEligible*100) : 0;
+  const totalDoneManual = doc.totalDoneManual!=null ? doc.totalDoneManual : rows.reduce((a,g)=>a+g.doneManual,0);
+  const totalDoneAuto = doc.totalDoneAuto!=null ? doc.totalDoneAuto : rows.reduce((a,g)=>a+g.doneAuto,0);
+
+  // live bucket breakdown by GM (from current SELLERS, not the frozen weekly doc)
+  const breakdownRows = GM_LIST.map(g=>{
+    const gmSellers = SELLERS.filter(s=>s.gm===g);
+    const counts = {};
+    BREAKDOWN_BUCKETS.forEach(bk=> counts[bk] = gmSellers.filter(s=>s.bucket===bk).length);
+    return {gm:g, counts};
+  });
+  const breakdownTotals = {};
+  BREAKDOWN_BUCKETS.forEach(bk=> breakdownTotals[bk] = SELLERS.filter(s=>s.bucket===bk).length);
+
+  body.innerHTML = `
+    <div class="stats">
+      <div class="stat-tile"><div class="n mono">${doc.totalEligible}</div><div class="l">Total Eligible</div><div class="cap">${escapeHtml(doc.dateRange||'')}</div></div>
+      <div class="stat-tile"><div class="n mono">${doc.totalDone}</div><div class="l">Total TS Done</div><div class="cap">${totalDoneManual} manual · ${totalDoneAuto} auto</div></div>
+      <div class="stat-tile"><div class="n mono">${doc.totalEligible-doc.totalDone}</div><div class="l">Total Pending</div></div>
+      <div class="stat-tile"><div class="n mono">${overallRate}%</div><div class="l">Overall Compliance</div></div>
+    </div>
+    <div class="card">
+      <h2 class="card-head-row">Compliance by GM — ${escapeHtml(doc.weekLabel)} <button class="btn-download-sm" data-download="compliance-leaderboard" title="Download as CSV">⬇ CSV</button></h2>
+      <table class="simple">
+        <thead><tr>${COMPLIANCE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable">${c.label}${sortArrow(c.key, state.complianceSort)}</th>`).join("")}</tr></thead>
+        <tbody>
+          <tr class="total-row"><td>All GMs (Overall)</td><td class="mono">${doc.totalEligible}</td><td class="mono">${doc.totalDone}</td><td class="mono">${totalDoneManual}</td><td class="mono">${totalDoneAuto}</td><td class="mono">${doc.totalEligible-doc.totalDone}</td><td><span class="rate-bar"><div style="width:${overallRate}%"></div></span>${overallRate}%</td></tr>
+          ${rows.map(g=>`<tr><td>${escapeHtml(g.gm)}</td><td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td class="mono">${g.doneManual}</td><td class="mono">${g.doneAuto}</td><td class="mono">${g.pending}</td><td><span class="rate-bar"><div style="width:${g.rate}%"></div></span>${g.rate}%</td></tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2 class="card-head-row">Bucket totals by GM <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— click a count to see which sellers</span> <button class="btn-download-sm" data-download="bucket-breakdown" title="Download as CSV">⬇ CSV</button></h2>
+      <table class="simple">
+        <thead><tr><th>GM</th>${BREAKDOWN_BUCKETS.map(bk=>`<th>${BUCKET_META[bk].label}</th>`).join("")}</tr></thead>
+        <tbody>
+          <tr class="total-row"><td>All GMs (Overall)</td>${BREAKDOWN_BUCKETS.map(bk=>`<td class="mono" data-bucket-cell="${bk}" data-gm-name="" style="cursor:pointer;">${breakdownTotals[bk]}</td>`).join("")}</tr>
+          ${breakdownRows.map(r=>`<tr><td>${escapeHtml(r.gm)}</td>${BREAKDOWN_BUCKETS.map(bk=>`<td class="mono" data-bucket-cell="${bk}" data-gm-name="${escapeHtml(r.gm)}" style="cursor:${r.counts[bk]?'pointer':'default'};${r.counts[bk]?'':'color:var(--text-faint);'}">${r.counts[bk]||0}</td>`).join("")}</tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
+    ${renderZeroGmvComplianceCard(doc)}
+  `;
+  window._complianceRowsForExport = rows;
+  window._breakdownRowsForExport = breakdownRows;
+  window._breakdownTotalsForExport = breakdownTotals;
+}
+
+function renderZeroGmvComplianceCard(doc){
+  const rows = Object.values(doc.byGM||{})
+    .filter(g=>g.zeroGmvEligible)
+    .map(g=>({gm:g.gm, eligible:g.zeroGmvEligible||0, done:g.zeroGmvDone||0, doneManual:g.zeroGmvDoneManual||0, doneAuto:g.zeroGmvDoneAuto||0,
+      pending:(g.zeroGmvEligible||0)-(g.zeroGmvDone||0), rate: g.zeroGmvEligible? Math.round((g.zeroGmvDone||0)/g.zeroGmvEligible*100):0}))
+    .sort((a,b)=> b.rate-a.rate || b.eligible-a.eligible);
+  if(!rows.length){
+    window._zeroGmvRowsForExport = [];
+    return `<div class="card"><h2>Zero GMV Task Compliance</h2><div class="empty-state">No zero-GMV task data recorded for this week yet.</div></div>`;
+  }
+  const totalElig = doc.totalZeroGmvEligible!=null ? doc.totalZeroGmvEligible : rows.reduce((a,g)=>a+g.eligible,0);
+  const totalDone = doc.totalZeroGmvDone!=null ? doc.totalZeroGmvDone : rows.reduce((a,g)=>a+g.done,0);
+  const totalManual = doc.totalZeroGmvDoneManual!=null ? doc.totalZeroGmvDoneManual : rows.reduce((a,g)=>a+g.doneManual,0);
+  const totalAuto = doc.totalZeroGmvDoneAuto!=null ? doc.totalZeroGmvDoneAuto : rows.reduce((a,g)=>a+g.doneAuto,0);
+  const totalRate = totalElig ? Math.round(totalDone/totalElig*100) : 0;
+  window._zeroGmvRowsForExport = rows;
+  return `<div class="card">
+    <h2 class="card-head-row">Zero GMV Task Compliance by GM <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— Monday-only mandatory task, W1 spend >₹1,000 with zero orders</span> <button class="btn-download-sm" data-download="zero-gmv-compliance" title="Download as CSV">⬇ CSV</button></h2>
+    <table class="simple">
+      <thead><tr><th>GM</th><th>Eligible</th><th>Done</th><th>Manual</th><th>Auto</th><th>Pending</th><th>Compliance</th></tr></thead>
+      <tbody>
+        <tr class="total-row"><td>All GMs (Overall)</td><td class="mono">${totalElig}</td><td class="mono">${totalDone}</td><td class="mono">${totalManual}</td><td class="mono">${totalAuto}</td><td class="mono">${totalElig-totalDone}</td><td><span class="rate-bar"><div style="width:${totalRate}%"></div></span>${totalRate}%</td></tr>
+        ${rows.map(g=>`<tr><td>${escapeHtml(g.gm)}</td><td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td class="mono">${g.doneManual}</td><td class="mono">${g.doneAuto}</td><td class="mono">${g.pending}</td><td><span class="rate-bar"><div style="width:${g.rate}%"></div></span>${g.rate}%</td></tr>`).join("")}
+      </tbody>
+    </table>
+  </div>`;
+}
+
+function wireComplianceTab(){
+  renderCompliance();
+  const sel = document.getElementById("complianceWeekSel");
+  if(sel) sel.addEventListener("change", e=>{ state.complianceWeek = e.target.value; renderCompliance(); });
+}
+
+function openBucketList(gmName, bucketKey){
+  const meta = BUCKET_META[bucketKey];
+  const list = gmName ? SELLERS.filter(s=>s.gm===gmName && s.bucket===bucketKey) : SELLERS.filter(s=>s.bucket===bucketKey);
+  if(!list.length) return;
+  window._bucketListForExport = list;
+  detailScrim.innerHTML = `
+    <div class="panel">
+      <h2 class="card-head-row">${meta.label}${gmName?` — ${escapeHtml(gmName)}`:' — All GMs'} <button class="btn-download-sm" data-download="bucket-list" data-bucket-key="${bucketKey}${gmName?'_'+slugify(gmName):''}" title="Download as CSV">⬇ CSV</button></h2>
+      <div class="detail-meta">${list.length} seller${list.length===1?'':'s'}</div>
+      <div class="notes-log" style="max-height:400px;">
+        ${list.map(s=>`<div class="change-item" data-id="${escapeHtml(s.id)}" style="cursor:pointer;">
+          <span>${escapeHtml(s.name)} <span class="sid">${escapeHtml(s.id)}</span></span>
+          <span style="color:var(--text-faint);">${escapeHtml(s.gm)}</span>
+        </div>`).join("")}
+      </div>
+      <div class="panel-actions"><button class="btn-ghost" id="closeDetailBtn">Close</button></div>
+    </div>
+  `;
+  detailScrim.hidden = false;
+  document.getElementById("closeDetailBtn").onclick = closeDetail;
+  detailScrim.querySelectorAll(".change-item[data-id]").forEach(el=>{
+    el.addEventListener("click", ()=> openSellerDetail(el.dataset.id));
+  });
+  const dlBtn = detailScrim.querySelector("[data-download='bucket-list']");
+  if(dlBtn) dlBtn.onclick = ()=> downloadCsv(`${dlBtn.dataset.bucketKey||"bucket"}_list.csv`, window._bucketListForExport||[], [
+    {key:"id",label:"Seller ID"},{key:"name",label:"Seller Name"},{key:"gm",label:"GM"},
+  ]);
+}
+
+// ================= MOVEMENT TAB =================
+function movementTemplate(){
+  const weekKeySet = new Set();
+  SELLERS.forEach(s=> Object.keys(s.movement||{}).forEach(k=>weekKeySet.add(k)));
+  const weekKeys = [...weekKeySet].sort().reverse();
+  if(!state.moveWeek) state.moveWeek = weekKeys[0];
+  const opts = weekKeys.map(k=>`<option value="${k}" ${k===state.moveWeek?'selected':''}>${escapeHtml(k)}</option>`).join("");
+  return `
+    <div class="caveat">
+      <b>What this tracks:</b> RTO% and PNL% for a given tracked week keep settling for several days after the week ends (more returns get confirmed). Each day this refreshes, a new column is added here so you can see a seller drift between buckets as its numbers finalize. Tracking starts today — history builds forward from here.
+      Only sellers with ≥₹3,000 marketing spend for that specific week are shown.
+    </div>
+    <div class="controls">
+      <select class="field" id="moveWeekSel">${opts || '<option>No data yet</option>'}</select>
+      <select class="field" id="moveGmSel"><option value="">All GMs</option>${GM_LIST.map(g=>`<option value="${escapeHtml(g)}" ${state.moveGm===g?'selected':''}>${escapeHtml(g)}</option>`).join("")}</select>
+      <input class="search" id="moveSearch" type="text" placeholder="Search seller name or ID…" value="${escapeHtml(state.moveQ)}">
+      <button class="btn-download" data-download="movement" title="Download the current movement view as CSV">⬇ CSV</button>
+    </div>
+    <div class="card movement-grid-wrap"><div id="movementTableWrap"></div></div>
+  `;
+}
+
+function renderMovementTable(){
+  const wrap = document.getElementById("movementTableWrap");
+  if(!wrap) return;
+  const wk = state.moveWeek;
+  if(!wk){ wrap.innerHTML = `<div class="empty-state">No movement data recorded yet.</div>`; return; }
+  let rows = SELLERS.filter(s=> s.movement && s.movement[wk] && s.movement[wk].length);
+  // only sellers with >=3000 marketing spend for THAT specific tracked week
+  rows = rows.filter(s=>{
+    const obs = s.movement[wk];
+    const latest = obs[obs.length-1];
+    return latest && latest.spend != null && latest.spend >= 3000;
+  });
+  if(state.moveGm) rows = rows.filter(s=>s.gm===state.moveGm);
+  if(state.moveQ){
+    const q = state.moveQ.toLowerCase();
+    rows = rows.filter(s=> s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q));
+  }
+  if(!rows.length){
+    wrap.innerHTML = `<div class="empty-bucket">No sellers with ≥₹3,000 spend and movement data for this week / filter (new_pnl-sourced sellers aren't tracked yet — see banner above).</div>`;
+    window._movementRowsForExport = []; window._movementColsForExport = [];
+    return;
+  }
+
+  rows = sortRows(rows, state.moveSort.field, state.moveSort.dir, (s,f)=> f==="bucket" ? (BUCKET_META[s.bucket]?BUCKET_META[s.bucket].label:null) : s[f]);
+
+  const dateSet = new Set();
+  rows.forEach(s=> s.movement[wk].forEach(o=>dateSet.add(o.date)));
+  const dates = [...dateSet].sort();
+
+  // build flat export rows/cols alongside the grid (one row per seller, one RTO/PNL column pair per date)
+  const exportCols = [
+    {key:"id",label:"Seller ID"},{key:"name",label:"Seller Name"},{key:"gm",label:"GM"},
+    {key:"bestSource",label:"Source"},{key:"bucketLabel",label:"Bucket"},
+  ];
+  dates.forEach(d=>{ exportCols.push({key:"rto_"+d,label:d+" RTO%"}); exportCols.push({key:"pnl_"+d,label:d+" PNL%"}); });
+  const exportRows = rows.map(s=>{
+    const byDate = {}; s.movement[wk].forEach(o=> byDate[o.date]=o);
+    const r = {id:s.id, name:s.name, gm:s.gm, bestSource:s.bestSource, bucketLabel: BUCKET_META[s.bucket]?BUCKET_META[s.bucket].label:""};
+    dates.forEach(d=>{ const o=byDate[d]; r["rto_"+d]= o&&o.rto!=null?o.rto:""; r["pnl_"+d]= o&&o.pnl!=null?o.pnl:""; });
+    return r;
+  });
+  window._movementRowsForExport = exportRows;
+  window._movementColsForExport = exportCols;
+
+  const MOVE_SORT_COLS = [{key:"name",label:"Seller"},{key:"gm",label:"GM"},{key:"bestSource",label:"Source"},{key:"bucket",label:"Bucket"}];
+  wrap.innerHTML = `<table class="movement">
+    <thead><tr>${MOVE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable">${c.label}${sortArrow(c.key, state.moveSort)}</th>`).join("")}${dates.map(d=>`<th class="daycol" colspan="2">${fmtDateLabel(d)}</th>`).join("")}</tr>
+    <tr><th></th><th></th><th></th><th></th>${dates.map(()=>`<th class="daycol">RTO%</th><th class="daycol">PNL%</th>`).join("")}</tr></thead>
+    <tbody>
+      ${rows.map(s=>{
+        const byDate = {};
+        s.movement[wk].forEach(o=> byDate[o.date]=o);
+        const bm = BUCKET_META[s.bucket];
+        const bucketBadge = bm ? `<span class="status-pill" style="background:${bm.color};color:#fff;">${bm.label}</span>` : `<span class="na">none</span>`;
+        return `<tr>
+          <td>${escapeHtml(s.name)}<div class="sid">${escapeHtml(s.id)}</div></td>
+          <td>${escapeHtml(s.gm)}</td>
+          <td><span class="src-tag">${escapeHtml(s.bestSource)}</span></td>
+          <td>${bucketBadge}</td>
+          ${dates.map((d,di)=>{
+            const o = byDate[d];
+            const prevO = di>0 ? byDate[dates[di-1]] : null;
+            const pnlHtml = o&&o.pnl!=null ? `<span class="${pnlColorClass(o.pnl, o.spend)}">${o.pnl.toFixed(1)}%</span>` : '—';
+            const rtoHtml = o&&o.rto!=null ? rtoTrendHtml(prevO&&prevO.rto!=null?prevO.rto:null, o.rto) : '—';
+            return `<td class="daycol mono">${rtoHtml}</td><td class="daycol mono">${pnlHtml}</td>`;
+          }).join("")}
+        </tr>`;
+      }).join("")}
+    </tbody>
+  </table>`;
+}
+
+function wireMovementTab(){
+  renderMovementTable();
+  const s1 = document.getElementById("moveWeekSel"); if(s1) s1.onchange = e=>{ state.moveWeek = e.target.value; renderMovementTable(); };
+  const s2 = document.getElementById("moveGmSel"); if(s2) s2.onchange = e=>{ state.moveGm = e.target.value || null; renderMovementTable(); };
+  const s3 = document.getElementById("moveSearch"); if(s3) s3.oninput = e=>{ state.moveQ = e.target.value; renderMovementTable(); };
+}
+
+// ================= ROSTER CHANGES TAB =================
+function rosterTemplate(){
+  return `<div id="rosterBody"></div>`;
+}
+function renderRoster(){
+  const body = document.getElementById("rosterBody");
+  if(!body) return;
+  const dates = Object.keys(ROSTER_CHANGES).sort().reverse();
+  if(!dates.length){ body.innerHTML = `<div class="empty-state">No roster snapshots recorded yet.</div>`; return; }
+  const latest = ROSTER_CHANGES[dates[0]];
+  if(latest.baseline){
+    body.innerHTML = `<div class="card">
+      <h2>Roster baseline established</h2>
+      <p style="font-size:13px;color:var(--text-muted);">On ${escapeHtml(latest.date)}, <b>${latest.totalActive}</b> sellers were captured as the active roster baseline. The assigned-sellers list refreshes every morning; from tomorrow onward, this tab will show which sellers were added or removed each day, rolled up by week.</p>
+    </div>`;
+    return;
+  }
+  // group by ISO week (Mon-Sun) for a weekly rollup
+  function isoWeekKey(dateStr){
+    const d = new Date(dateStr+"T00:00:00");
+    const day = (d.getDay()+6)%7;
+    d.setDate(d.getDate()-day);
+    return d.toISOString().slice(0,10);
+  }
+  const byWeek = {};
+  dates.forEach(d=>{
+    const doc = ROSTER_CHANGES[d];
+    if(doc.baseline) return;
+    const wk = isoWeekKey(d);
+    byWeek[wk] = byWeek[wk] || {added:[], removed:[]};
+    byWeek[wk].added.push(...(doc.added||[]));
+    byWeek[wk].removed.push(...(doc.removed||[]));
+  });
+  const weeks = Object.keys(byWeek).sort().reverse();
+  const exportRows = [];
+  weeks.forEach(wk=>{
+    const w = byWeek[wk];
+    w.added.forEach(s=> exportRows.push({changeType:"Added", weekOf:wk, name:s.name, id:s.id, gm:s.gm}));
+    w.removed.forEach(s=> exportRows.push({changeType:"Removed", weekOf:wk, name:s.name, id:s.id, gm:s.gm}));
+  });
+  window._rosterRowsForExport = exportRows;
+  body.innerHTML = `<div class="controls" style="margin-bottom:14px;"><button class="btn-download" data-download="roster-changes" title="Download all recorded roster changes as CSV">⬇ CSV — all changes</button></div>` +
+    weeks.map(wk=>{
+    const w = byWeek[wk];
+    return `<div class="card">
+      <h2>Week of ${escapeHtml(wk)} — ${w.added.length} added, ${w.removed.length} removed</h2>
+      ${w.added.length? `<div style="margin-bottom:8px;"><span class="tag-added">ADDED (${w.added.length})</span>${w.added.map(s=>`<div class="change-item"><span>${escapeHtml(s.name)} <span class="sid">${escapeHtml(s.id)}</span></span><span>${escapeHtml(s.gm)}</span></div>`).join("")}</div>` : ""}
+      ${w.removed.length? `<div><span class="tag-removed">REMOVED (${w.removed.length})</span>${w.removed.map(s=>`<div class="change-item"><span>${escapeHtml(s.name)} <span class="sid">${escapeHtml(s.id)}</span></span><span>${escapeHtml(s.gm)}</span></div>`).join("")}</div>` : ""}
+      ${(!w.added.length && !w.removed.length) ? '<div class="empty-state">No changes this week.</div>' : ""}
+    </div>`;
+  }).join("") + `<div class="caveat">Baseline was established ${escapeHtml(dates[dates.length-1])}.</div>`;
+}
+
+function wireTab(){
+  if(state.tab==="queue") wireQueueTab();
+  else if(state.tab==="compliance") wireComplianceTab();
+  else if(state.tab==="movement") wireMovementTab();
+  else if(state.tab==="roster") renderRoster();
+}
+
+// ---------- data loading (plain JSON files, refreshed by the daily pipeline) ----------
+async function init(){
+  try{
+    const [gmSellersMap, complianceMap, rosterMap] = await Promise.all([
+      fetch('data/gm_sellers.json', {cache:"no-store"}).then(r=>r.json()),
+      fetch('data/weekly_compliance.json', {cache:"no-store"}).then(r=>r.json()).catch(()=>({})),
+      fetch('data/roster_changes.json', {cache:"no-store"}).then(r=>r.json()).catch(()=>({})),
+    ]);
+    const gmDocs = Object.entries(gmSellersMap).map(([id, data])=>({ id, data: () => data }));
+    flattenSnapshot(gmDocs);
+    COMPLIANCE_WEEKS = complianceMap;
+    ROSTER_CHANGES = rosterMap;
+    renderShell();
+  }catch(e){
+    console.error(e);
+    document.getElementById("loadingState").textContent = "Couldn't load dashboard data — try reloading the page.";
+  }
+}
+init();
+</script>
+</body>
+</html>
