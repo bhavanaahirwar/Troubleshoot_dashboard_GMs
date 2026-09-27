@@ -370,12 +370,13 @@ function renderShell(){
   if(LAST_REFRESH){
     const d = new Date(LAST_REFRESH);
     const ageHours = (Date.now() - d.getTime()) / 3600000;
-    const label = "Data as of " + d.toLocaleString(undefined, {month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
+    const label = "Last updated: " + d.toLocaleString(undefined, {day:"numeric", month:"short", year:"numeric", hour:"numeric", minute:"2-digit"});
     pill.textContent = ageHours > 30 ? label + " — STALE, refresh overdue" : label;
+    pill.title = "Updates whenever the daily refresh pushes fresh data — reload this page to pick up a new update.";
     pill.style.color = ageHours > 30 ? "var(--down-fg)" : "";
     pill.style.borderColor = ageHours > 30 ? "var(--down-fg)" : "";
   } else {
-    pill.textContent = "Live data";
+    pill.textContent = "Last updated: unknown";
   }
   renderTab();
 }
