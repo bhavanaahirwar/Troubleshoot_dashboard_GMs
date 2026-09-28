@@ -508,7 +508,7 @@ function queueTemplate(){
     <div class="caveat" id="caveatBox">
       <button class="x" id="caveatClose">&times;</button>
       <b>How to read this:</b> PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
-      RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log.
+      RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log. For Objective Hit, Potential, Breakeven Potential, and Bucket Health specifically, an auto-TS alone does NOT count as done — a manual TS is required from the GM; such accounts show as Pending with a note even if Hitesh Agarwal's auto-TS already ran.
       <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Its current cohort is the most recent one available; this week's batch appears here once it's created.
     </div>
     <div class="stats" id="statsRow"></div>
@@ -629,7 +629,9 @@ function rtoTrendHtml(oldV, newV){
 function rowHtml(s){
   const statusHtml = s.tsDone
     ? `<span class="status-pill done">Done${s.tsType==='auto_ts'?'<span class="ts-type">AUTO</span>':''}</span><div class="ts-meta">${escapeHtml(s.tsType==='manual_ts'?(s.tsBy||''):'Hitesh Agarwal')} · ${s.tsDate||''}</div>`
-    : `<span class="status-pill pending">Pending</span>`;
+    : (s.tsType==='auto_ts'
+        ? `<span class="status-pill pending">Pending</span><div class="ts-meta">Auto TS done ${s.tsDate||''} — manual still required</div>`
+        : `<span class="status-pill pending">Pending</span>`);
   return `<div class="row" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
     <div class="seller" data-label="Seller">${escapeHtml(s.name)}<div class="sid">${escapeHtml(s.id)}</div></div>
     <div data-label="GM">${escapeHtml(s.gm)}</div>
@@ -716,7 +718,9 @@ function openSellerDetail(id){
   const statusHtml = s.tsDone
     ? `<span class="status-pill done">Done${s.tsType==='auto_ts'?'<span class="ts-type">AUTO</span>':''}</span>
        <div class="ts-meta">by ${escapeHtml(s.tsType==='manual_ts'?(s.tsBy||''):'Hitesh Agarwal')} on ${escapeHtml(s.tsDate||'')}</div>`
-    : `<span class="status-pill pending">Pending</span>`;
+    : (s.tsType==='auto_ts'
+        ? `<span class="status-pill pending">Pending</span><div class="ts-meta">Auto TS done ${escapeHtml(s.tsDate||'')} — this bucket requires a manual TS too</div>`
+        : `<span class="status-pill pending">Pending</span>`);
   detailScrim.innerHTML = `
     <div class="panel" style="max-width:640px;">
       <h2>${escapeHtml(s.name)}</h2>
