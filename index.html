@@ -195,6 +195,61 @@
     .row .seller::before, .row .sid::before{ display:none; }
     .stats{ grid-template-columns:repeat(2,1fr); }
   }
+  /* ---- compact presentation layer ---- */
+  body{ font-size:12.5px; }
+  .wrap{ padding-block:14px 40px; }
+  .topbar{ padding-bottom:10px; margin-bottom:12px; }
+  .brand h1{ font-size:15.5px; }
+  .brand .sub{ font-size:11px; }
+  .tabs{ gap:6px; border-bottom:none; margin-bottom:14px; }
+  .tabs button{ font-size:12px; padding:6px 14px; border:1px solid var(--border); border-radius:999px; background:var(--surface); margin-bottom:0; }
+  .tabs button:hover{ border-color:var(--accent); color:var(--accent); }
+  .tabs button.active{ background:var(--accent); color:var(--accent-contrast); border-color:var(--accent); }
+  .stats{ grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:8px; }
+  .stat-tile{ padding:9px 12px; border-radius:10px; border-top:3px solid var(--accent); box-shadow:none; }
+  .stat-tile:nth-child(2){ border-top-color:var(--b-health); }
+  .stat-tile:nth-child(3){ border-top-color:var(--b-objective); }
+  .stat-tile:nth-child(4){ border-top-color:var(--b-breakeven); }
+  .stat-tile:nth-child(5){ border-top-color:var(--b-potential); }
+  .stat-tile:nth-child(6){ border-top-color:var(--b-zerogmv); }
+  .stat-tile .n{ font-size:19px; }
+  .stat-tile .l{ font-size:9.5px; }
+  .stat-tile .cap{ font-size:10px; }
+  .caveat{ font-size:11px; padding:9px 12px; border-radius:8px; }
+  .controls{ gap:8px; margin-bottom:12px; }
+  .seg{ border-radius:8px; box-shadow:none; }
+  .seg button{ font-size:11.5px; padding:6px 11px; }
+  .search, select.field, .btn-download{ font-size:11.5px; padding:6px 10px; border-radius:8px; box-shadow:none; }
+  .sidebar{ border-radius:10px; box-shadow:none; }
+  .gm-row{ font-size:11.5px; padding:6px 8px; }
+  .bucket{ border-radius:10px; box-shadow:none; margin-bottom:10px; }
+  .bucket-head{ padding:9px 14px; background:var(--surface-2); border-bottom:1px solid var(--border); }
+  .bucket-head .title{ font-size:13px; }
+  .bucket-head .desc{ font-size:10.5px; }
+  .row-head, .row{ font-size:11px; padding:7px 14px; }
+  .row-head{ font-size:9px; }
+  .card{ border-radius:10px; padding:12px 14px; box-shadow:none; }
+  .card h2{ font-size:13px; padding-bottom:8px; border-bottom:1px solid var(--border); }
+  table.simple{ font-size:11.5px; border:1px solid var(--border); }
+  table.simple th{ font-size:9.5px; background:var(--surface-2); color:var(--text-muted); padding:6px 8px; border:1px solid var(--border); vertical-align:bottom; line-height:1.3; }
+  table.simple td{ padding:5px 8px; border:1px solid var(--border); }
+  table.simple tbody tr:nth-child(even) td{ background:color-mix(in srgb, var(--surface-2) 45%, transparent); }
+  table.simple tbody tr:hover td{ background:var(--accent-soft); }
+  table.simple tr.total-row td{ background:var(--accent-soft); }
+  table.simple th.grp{ background:var(--surface); border:none; }
+  table.simple th.grp.band{ background:var(--accent-soft); color:var(--accent); border:1px solid var(--border); font-weight:700; }
+  .rate-bar{ width:52px; height:5px; }
+  .rate-bar > div.hi{ background:var(--up-fg); }
+  .rate-bar > div.mid{ background:#f59e0b; }
+  .rate-bar > div.lo{ background:var(--down-fg); }
+  .rate-txt{ font-weight:700; }
+  .rate-txt.hi{ color:var(--up-fg); } .rate-txt.mid{ color:var(--pending-fg); } .rate-txt.lo{ color:var(--down-fg); }
+  .pend-num{ display:inline-block; min-width:26px; text-align:center; padding:1px 7px; border-radius:999px; background:var(--pending-bg); color:var(--pending-fg); font-weight:700; }
+  .pend-num.zero{ background:var(--done-bg); color:var(--done-fg); }
+  table.movement{ font-size:11px; }
+  table.movement th, table.movement td{ padding:5px 8px; }
+  .owner-bar{ justify-content:space-between; }
+  @media (max-width:980px){ .stats{ grid-template-columns:repeat(2,1fr); } }
 </style>
 </head>
 <body>
@@ -209,6 +264,9 @@
       </div>
     </div>
     <span class="asof-pill" id="asofPill">—</span>
+    <button class="theme-btn" id="ownerRtoBtn" title="RTO / PNL movement">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 15l4-4 3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
     <button class="theme-btn" id="themeBtn" title="Toggle theme">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" id="themeIcon"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
@@ -217,7 +275,6 @@
   <div class="tabs" id="tabs">
     <button data-t="queue" class="active">Priority Queue</button>
     <button data-t="compliance">Compliance</button>
-    <button data-t="movement">RTO / PNL Movement</button>
     <button data-t="roster">Roster Changes</button>
   </div>
 
@@ -362,7 +419,9 @@ function eligType(s){
 function isZG(s){ return !!(s.zeroGmv && s.zeroGmv.isZeroGmv); }
 function pctOrNull(a, b){ return b ? Math.round(a/b*100) : null; }
 function numCell(v){ return v==null ? '<span class="na">—</span>' : `<span class="mono">${v}</span>`; }
-function rateCell(r){ return r==null ? '<span class="na">—</span>' : `<span class="rate-bar"><div style="width:${r}%"></div></span>${r}%`; }
+function rateCls(r){ return r >= 80 ? "hi" : r >= 50 ? "mid" : "lo"; }
+function rateCell(r){ return r==null ? '<span class="na">—</span>' : `<span class="rate-bar"><div class="${rateCls(r)}" style="width:${r}%"></div></span><span class="rate-txt ${rateCls(r)}">${r}%</span>`; }
+function pendCell(n){ return n==null ? '<span class="na">—</span>' : `<span class="pend-num mono ${n ? '' : 'zero'}">${n}</span>`; }
 function eligLabel(s){
   const et = eligType(s);
   if(et==="auto") return "Auto (tagged auto in the auto-TS program)";
@@ -424,7 +483,7 @@ function renderShell(){
   } else {
     pill.textContent = "Last updated: unknown";
   }
-  renderTab();
+  if(location.hash === "#rto" && state.tab !== "movement") openOwnerRto(); else renderTab();
 }
 
 // Single delegated click handler on the stable #appRoot container. Rows, bucket
@@ -498,9 +557,8 @@ document.getElementById("appRoot").addEventListener("click", e=>{
       downloadCsv(`compliance_by_gm_${state.complianceWeek||"week"}.csv`, rows, [
         {key:"gm",label:"GM names"},{key:"eligible",label:"Total eligible sellers for TS"},{key:"done",label:"Total TS done till now"},{key:"rate",label:"Total compliance %"},
         {key:"manualEligible",label:"Total manual TS eligible"},{key:"manualDone",label:"TS done by GM - out of manual eligible"},{key:"manualOnAuto",label:"TS done by GM - out of auto eligible"},
-        {key:"manualRate",label:"Manual TS compliance %"},{key:"gmRate",label:"Total compliance of GM %"},
+        {key:"manualRate",label:"Manual TS compliance %"},{key:"gmRate",label:"Total compliance of GM %"},{key:"gmPending",label:"Pending TS for GM"},
         {key:"autoEligible",label:"Total auto TS eligible"},{key:"autoDone",label:"Total auto TS done"},{key:"autoRate",label:"Auto TS compliance %"},
-        {key:"gmPending",label:"GM pending"},
       ]);
     } else if(kind === "zero-gmv-compliance"){
       const rows = window._zeroGmvRowsForExport || [];
@@ -543,6 +601,13 @@ document.getElementById("tabs").addEventListener("click", e=>{
   state.tab = b.dataset.t;
   renderTab();
 });
+// RTO / PNL movement is an owner-only view: reachable from the header icon (or #rto on the site URL), not the tab bar.
+function openOwnerRto(){
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("active"));
+  state.tab = "movement";
+  renderTab();
+}
+document.getElementById("ownerRtoBtn").onclick = openOwnerRto;
 
 function renderTab(){
   const root = document.getElementById("appRoot");
@@ -891,7 +956,7 @@ const COMPLIANCE_SORT_COLS = [
   {key:"gm", label:"GM names"},
   {key:"eligible", label:"Total eligible sellers for TS"}, {key:"done", label:"Total TS done till now"}, {key:"rate", label:"Total compliance"},
   {key:"manualEligible", label:"Total manual TS eligible", sep:true}, {key:"manualDone", label:"Out of manual eligible"}, {key:"manualOnAuto", label:"Out of auto eligible"},
-  {key:"manualRate", label:"Manual TS compliance"}, {key:"gmRate", label:"Total compliance of GM"},
+  {key:"manualRate", label:"Manual TS compliance"}, {key:"gmRate", label:"Total compliance of GM"}, {key:"gmPending", label:"Pending TS for GM"},
   {key:"autoEligible", label:"Total auto TS eligible", sep:true}, {key:"autoDone", label:"Total auto TS done"}, {key:"autoRate", label:"Auto TS compliance"},
 ];
 // Total = C/B · Manual TS = G/F · Total of GM = (G+H)/F · Auto TS = M/L (column letters from the owner's sheet layout)
@@ -909,7 +974,7 @@ function complianceRowHtml(g, cls){
   return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(g.gm)}</td>
     <td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td>${rateCell(g.rate)}</td>
     <td class="grp-sep">${numCell(g.manualEligible)}</td><td>${numCell(g.manualDone)}</td><td>${numCell(g.manualOnAuto)}</td>
-    <td>${rateCell(g.manualRate)}</td><td>${rateCell(g.gmRate)}</td>
+    <td>${rateCell(g.manualRate)}</td><td>${rateCell(g.gmRate)}</td><td>${pendCell(g.gmPending)}</td>
     <td class="grp-sep">${numCell(g.autoEligible)}</td><td>${numCell(g.autoDone)}</td><td>${rateCell(g.autoRate)}</td></tr>`;
 }
 const BREAKDOWN_BUCKETS = ["objective_hit","potential","breakeven_potential","bucket_health","rest_ts_pending"];
@@ -955,7 +1020,7 @@ function renderCompliance(){
       <h2 class="card-head-row">Compliance by GM — ${escapeHtml(doc.weekLabel)} <button class="btn-download-sm" data-download="compliance-leaderboard" title="Download as CSV">⬇ CSV</button></h2>
       <div class="table-scroll"><table class="simple">
         <thead>
-          <tr><th class="grp" colspan="5"></th><th class="grp" colspan="2">Total TS done by GM</th><th class="grp" colspan="5"></th></tr>
+          <tr><th class="grp" colspan="5"></th><th class="grp band" colspan="2">Total TS done by GM</th><th class="grp" colspan="6"></th></tr>
           <tr>${COMPLIANCE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable${c.sep?' grp-sep':''}">${c.label}${sortArrow(c.key, state.complianceSort)}</th>`).join("")}</tr>
         </thead>
         <tbody>
@@ -1099,6 +1164,7 @@ function movementTemplate(){
   if(!state.moveWeek) state.moveWeek = weekKeys[0];
   const opts = weekKeys.map(k=>`<option value="${k}" ${k===state.moveWeek?'selected':''}>${escapeHtml(k)}</option>`).join("");
   return `
+    <div class="controls owner-bar"><button class="btn-download" id="moveBackBtn">← Back to dashboard</button><span class="ts-meta">Owner view · not shown in the main tabs</span></div>
     <div class="caveat">
       <b>What this tracks:</b> RTO% and PNL% for a given tracked week keep settling for several days after the week ends (more returns get confirmed). Each day this refreshes, a new column is added here so you can see a seller drift between buckets as its numbers finalize. Tracking starts today — history builds forward from here.
       Only sellers with ≥₹3,000 marketing spend for that specific week are shown.
@@ -1207,6 +1273,13 @@ function renderMovementTable(){
 
 function wireMovementTab(){
   renderMovementTable();
+  const back = document.getElementById("moveBackBtn");
+  if(back) back.onclick = ()=>{
+    state.tab = "queue";
+    document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("active", x.dataset.t==="queue"));
+    try{ if(location.hash === "#rto") history.replaceState(null, "", location.pathname + location.search); }catch(e){}
+    renderTab();
+  };
   const s1 = document.getElementById("moveWeekSel"); if(s1) s1.onchange = e=>{ state.moveWeek = e.target.value; renderMovementTable(); };
   const s2 = document.getElementById("moveGmSel"); if(s2) s2.onchange = e=>{ state.moveGm = e.target.value || null; renderMovementTable(); };
   const s3 = document.getElementById("moveSearch"); if(s3) s3.oninput = e=>{ state.moveQ = e.target.value; renderMovementTable(); };
