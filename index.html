@@ -140,6 +140,7 @@
   .elig-tag{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:999px; border:1px solid var(--border); color:var(--text-muted); margin-left:4px; white-space:nowrap; }
   .table-scroll{ overflow-x:auto; }
   table.simple td:has(> .rate-bar){ white-space:nowrap; }
+  table.simple .grp-sep{ border-left:2px solid var(--border); }
   table.simple th.grp{ text-align:center; border-bottom:none; padding-bottom:0; color:var(--text-muted); }
   .ts-type{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:999px; background:var(--auto-bg); color:var(--auto-fg); margin-left:4px; }
   .ts-meta{ font-size:9.5px; color:var(--text-faint); margin-top:2px; }
@@ -355,7 +356,7 @@ const MANUAL_REQUIRED_BUCKETS = ["objective_hit","potential","breakeven_potentia
 function eligType(s){
   if(s.tsEligType !== undefined) return s.tsEligType;
   if(!s.eligible) return null;
-  if(MANUAL_REQUIRED_BUCKETS.includes(s.bucket)) return "manual";
+  if(MANUAL_REQUIRED_BUCKETS.includes(s.bucket) || isZG(s)) return "manual";
   return s.autoTag ? "auto" : "manual";
 }
 function isZG(s){ return !!(s.zeroGmv && s.zeroGmv.isZeroGmv); }
@@ -365,6 +366,7 @@ function rateCell(r){ return r==null ? '<span class="na">—</span>' : `<span cl
 function eligLabel(s){
   const et = eligType(s);
   if(et==="auto") return "Auto (tagged auto in the auto-TS program)";
+  if(et==="manual" && isZG(s)) return "Manual (GM) — Zero GMV sellers always need a manual TS";
   if(et==="manual") return s.autoTag ? "Manual (GM) — tagged auto, but this bucket needs a manual TS" : "Manual (GM)";
   return '<span class="na">not eligible — not counted in compliance</span>';
 }
@@ -494,10 +496,11 @@ document.getElementById("appRoot").addEventListener("click", e=>{
     if(kind === "compliance-leaderboard"){
       const rows = window._complianceRowsForExport || [];
       downloadCsv(`compliance_by_gm_${state.complianceWeek||"week"}.csv`, rows, [
-        {key:"gm",label:"GM"},{key:"eligible",label:"Total Eligible"},{key:"done",label:"Total Done"},{key:"rate",label:"Total Compliance %"},
-        {key:"autoEligible",label:"Auto Eligible"},{key:"autoDone",label:"Auto TS Done"},{key:"autoRate",label:"Auto Compliance %"},
-        {key:"manualEligible",label:"Manual Eligible"},{key:"manualDone",label:"Manual Done"},{key:"manualOnAuto",label:"GM TS On Auto-Eligible"},{key:"manualRate",label:"Manual Compliance %"},
-        {key:"gmPending",label:"GM Pending"},{key:"doneManual",label:"Done via Manual TS"},{key:"doneAuto",label:"Done via Auto TS"},
+        {key:"gm",label:"GM names"},{key:"eligible",label:"Total eligible sellers for TS"},{key:"done",label:"Total TS done till now"},{key:"rate",label:"Total compliance %"},
+        {key:"manualEligible",label:"Total manual TS eligible"},{key:"manualDone",label:"TS done by GM - out of manual eligible"},{key:"manualOnAuto",label:"TS done by GM - out of auto eligible"},
+        {key:"manualRate",label:"Manual TS compliance %"},{key:"gmRate",label:"Total compliance of GM %"},
+        {key:"autoEligible",label:"Total auto TS eligible"},{key:"autoDone",label:"Total auto TS done"},{key:"autoRate",label:"Auto TS compliance %"},
+        {key:"gmPending",label:"GM pending"},
       ]);
     } else if(kind === "zero-gmv-compliance"){
       const rows = window._zeroGmvRowsForExport || [];
@@ -557,8 +560,8 @@ function queueTemplate(){
       <button class="x" id="caveatClose">&times;</button>
       <b>How to read this:</b> PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
       RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log. For Objective Hit, Potential, Breakeven Potential, and Bucket Health specifically, an auto-TS alone does NOT count as done — a manual TS is required from the GM; such accounts show as Pending with a note even if Hitesh Agarwal's auto-TS already ran.
-      <b>Auto vs manual:</b> eligible sellers tagged <i>auto</i> in the auto-TS program (Metabase 9963) are <b>auto-eligible</b> (marked AUTO-ELIGIBLE) and are not counted as GM pending — except in the four buckets above, which stay manual. A TS logged on a seller who isn't TS-eligible is never counted in compliance. <b>Auto compliance</b> = auto-eligible sellers with an auto TS ÷ auto-eligible. <b>Manual compliance</b> = (manual-eligible sellers done + auto-eligible sellers the GM also troubleshot manually) ÷ manual-eligible.
-      <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Only tasks <b>scheduled on this week's Monday</b> are included — tasks created later in the week are not part of it.
+      <b>Auto vs manual:</b> eligible sellers tagged <i>auto</i> in the auto-TS program (Metabase 9963) are <b>auto-eligible</b> (marked AUTO-ELIGIBLE) and are not counted as GM pending — except in the four buckets above, which stay manual. A TS logged on a seller who isn't TS-eligible is never counted in compliance. <b>Auto compliance</b> = auto-eligible sellers with an auto TS ÷ auto-eligible. <b>Manual TS compliance</b> = manual-eligible sellers done ÷ manual-eligible. <b>Total compliance of GM</b> = (manual-eligible done + auto-eligible sellers the GM also troubleshot) ÷ manual-eligible.
+      <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Only tasks <b>scheduled on this week's Monday</b> are included — tasks created later in the week are not part of it. Zero GMV sellers always need a <b>manual TS from the GM</b> (an auto TS alone doesn't count), and they're counted in the main totals as manual-eligible.
     </div>
     <div class="stats" id="statsRow"></div>
     <div class="controls">
@@ -621,9 +624,10 @@ function renderQueueStats(){
   const pctTxt = (a,b)=>{ const p = pctOrNull(a,b); return p==null ? "—" : p+"%"; };
   const tiles = [
     {n:eligible.length, l:"Eligible for TS", cap:`${autoE.length} auto · ${manE.length} manual — ${state.gm || "All GMs"}`},
-    {n:pctTxt(done.length, eligible.length), l:"Overall compliance", cap:`${done.length}/${eligible.length} done · ${doneManual} manual TS · ${doneAuto} auto TS`},
-    {n:pctTxt(manD+manOnAuto, manE.length), l:"Manual (GM) compliance", cap:`(${manD} + ${manOnAuto} GM TS on auto-eligible) / ${manE.length}`},
-    {n:pctTxt(autoD, autoE.length), l:"Auto compliance", cap:`${autoD}/${autoE.length} auto TS done`},
+    {n:pctTxt(done.length, eligible.length), l:"Total compliance", cap:`${done.length}/${eligible.length} done · ${doneManual} manual TS · ${doneAuto} auto TS`},
+    {n:pctTxt(manD, manE.length), l:"Manual TS compliance", cap:`${manD}/${manE.length} manual-eligible done`},
+    {n:pctTxt(manD+manOnAuto, manE.length), l:"Total compliance of GM", cap:`(${manD} + ${manOnAuto} on auto-eligible) / ${manE.length}`},
+    {n:pctTxt(autoD, autoE.length), l:"Auto TS compliance", cap:`${autoD}/${autoE.length} auto TS done`},
     {n:manE.length-manD, l:"GM pending", cap:`+ ${autoE.length-autoD} awaiting auto TS (not on GM)`},
   ];
   const el = document.getElementById("statsRow");
@@ -884,26 +888,29 @@ function complianceTemplate(){
 }
 
 const COMPLIANCE_SORT_COLS = [
-  {key:"gm", label:"GM"},
-  {key:"eligible", label:"Eligible"}, {key:"done", label:"Done"}, {key:"rate", label:"Compliance"},
-  {key:"autoEligible", label:"Eligible"}, {key:"autoDone", label:"Done"}, {key:"autoRate", label:"Compliance"},
-  {key:"manualEligible", label:"Eligible"}, {key:"manualDone", label:"Done"}, {key:"manualOnAuto", label:"+ GM TS on auto"}, {key:"manualRate", label:"Compliance"},
-  {key:"gmPending", label:"GM Pending"},
+  {key:"gm", label:"GM names"},
+  {key:"eligible", label:"Total eligible sellers for TS"}, {key:"done", label:"Total TS done till now"}, {key:"rate", label:"Total compliance"},
+  {key:"manualEligible", label:"Total manual TS eligible", sep:true}, {key:"manualDone", label:"Out of manual eligible"}, {key:"manualOnAuto", label:"Out of auto eligible"},
+  {key:"manualRate", label:"Manual TS compliance"}, {key:"gmRate", label:"Total compliance of GM"},
+  {key:"autoEligible", label:"Total auto TS eligible", sep:true}, {key:"autoDone", label:"Total auto TS done"}, {key:"autoRate", label:"Auto TS compliance"},
 ];
+// Total = C/B · Manual TS = G/F · Total of GM = (G+H)/F · Auto TS = M/L (column letters from the owner's sheet layout)
 function complianceRowFromGm(g){
   const split = g.autoEligible != null;
+  const onAuto = split ? (g.manualOnAuto ?? 0) : null;
   return {...g, doneManual: g.doneManual||0, doneAuto: g.doneAuto||0, pending: g.eligible-g.done, rate: g.eligible ? Math.round(g.done/g.eligible*100) : 0,
+    manualEligible: split ? g.manualEligible : null, manualDone: split ? g.manualDone : null, manualOnAuto: onAuto,
+    manualRate: split ? pctOrNull(g.manualDone, g.manualEligible) : null,
+    gmRate: split ? pctOrNull(g.manualDone + onAuto, g.manualEligible) : null,
     autoEligible: split ? g.autoEligible : null, autoDone: split ? g.autoDone : null, autoRate: split ? pctOrNull(g.autoDone, g.autoEligible) : null,
-    manualEligible: split ? g.manualEligible : null, manualDone: split ? g.manualDone : null, manualOnAuto: split ? (g.manualOnAuto ?? 0) : null,
-    manualRate: split ? pctOrNull(g.manualDone + (g.manualOnAuto ?? 0), g.manualEligible) : null,
     gmPending: split ? g.manualEligible - g.manualDone : null};
 }
 function complianceRowHtml(g, cls){
   return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(g.gm)}</td>
     <td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td>${rateCell(g.rate)}</td>
-    <td>${numCell(g.autoEligible)}</td><td>${numCell(g.autoDone)}</td><td>${rateCell(g.autoRate)}</td>
-    <td>${numCell(g.manualEligible)}</td><td>${numCell(g.manualDone)}</td><td>${numCell(g.manualOnAuto)}</td><td>${rateCell(g.manualRate)}</td>
-    <td>${numCell(g.gmPending)}</td></tr>`;
+    <td class="grp-sep">${numCell(g.manualEligible)}</td><td>${numCell(g.manualDone)}</td><td>${numCell(g.manualOnAuto)}</td>
+    <td>${rateCell(g.manualRate)}</td><td>${rateCell(g.gmRate)}</td>
+    <td class="grp-sep">${numCell(g.autoEligible)}</td><td>${numCell(g.autoDone)}</td><td>${rateCell(g.autoRate)}</td></tr>`;
 }
 const BREAKDOWN_BUCKETS = ["objective_hit","potential","breakeven_potential","bucket_health","rest_ts_pending"];
 
@@ -938,17 +945,18 @@ function renderCompliance(){
   body.innerHTML = `
     <div class="stats">
       <div class="stat-tile"><div class="n mono">${doc.totalEligible}</div><div class="l">Total Eligible</div><div class="cap">${hasSplit ? `${totalRow.autoEligible} auto · ${totalRow.manualEligible} manual` : escapeHtml(doc.dateRange||'')}</div></div>
-      <div class="stat-tile"><div class="n mono">${overallRate}%</div><div class="l">Overall Compliance</div><div class="cap">${doc.totalDone}/${doc.totalEligible} done · ${totalDoneManual} manual TS · ${totalDoneAuto} auto TS</div></div>
-      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.manualRate)}</div><div class="l">Manual (GM) Compliance</div><div class="cap">${hasSplit ? `(${totalRow.manualDone} + ${totalRow.manualOnAuto} GM TS on auto-eligible) / ${totalRow.manualEligible}` : 'not tracked this week'}</div></div>
-      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.autoRate)}</div><div class="l">Auto Compliance</div><div class="cap">${hasSplit ? `${totalRow.autoDone}/${totalRow.autoEligible} auto TS done` : 'not tracked this week'}</div></div>
+      <div class="stat-tile"><div class="n mono">${overallRate}%</div><div class="l">Total Compliance</div><div class="cap">${doc.totalDone}/${doc.totalEligible} done · ${totalDoneManual} manual TS · ${totalDoneAuto} auto TS</div></div>
+      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.manualRate)}</div><div class="l">Manual TS Compliance</div><div class="cap">${hasSplit ? `${totalRow.manualDone}/${totalRow.manualEligible} manual-eligible done` : 'not tracked this week'}</div></div>
+      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.gmRate)}</div><div class="l">Total Compliance of GM</div><div class="cap">${hasSplit ? `(${totalRow.manualDone} + ${totalRow.manualOnAuto} on auto-eligible) / ${totalRow.manualEligible}` : 'not tracked this week'}</div></div>
+      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.autoRate)}</div><div class="l">Auto TS Compliance</div><div class="cap">${hasSplit ? `${totalRow.autoDone}/${totalRow.autoEligible} auto TS done` : 'not tracked this week'}</div></div>
       <div class="stat-tile"><div class="n mono">${hasSplit ? totalRow.gmPending : doc.totalEligible-doc.totalDone}</div><div class="l">${hasSplit ? 'GM Pending' : 'Total Pending'}</div><div class="cap">${hasSplit ? `+ ${totalRow.autoEligible-totalRow.autoDone} awaiting auto TS (not on GM)` : ''}</div></div>
     </div>
     <div class="card">
       <h2 class="card-head-row">Compliance by GM — ${escapeHtml(doc.weekLabel)} <button class="btn-download-sm" data-download="compliance-leaderboard" title="Download as CSV">⬇ CSV</button></h2>
       <div class="table-scroll"><table class="simple">
         <thead>
-          <tr><th class="grp"></th><th class="grp" colspan="3">Total eligible</th><th class="grp" colspan="3">Auto-eligible</th><th class="grp" colspan="4">Manual-eligible (GM)</th><th class="grp"></th></tr>
-          <tr>${COMPLIANCE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable">${c.label}${sortArrow(c.key, state.complianceSort)}</th>`).join("")}</tr>
+          <tr><th class="grp" colspan="5"></th><th class="grp" colspan="2">Total TS done by GM</th><th class="grp" colspan="5"></th></tr>
+          <tr>${COMPLIANCE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable${c.sep?' grp-sep':''}">${c.label}${sortArrow(c.key, state.complianceSort)}</th>`).join("")}</tr>
         </thead>
         <tbody>
           ${complianceRowHtml(totalRow, "total-row")}
