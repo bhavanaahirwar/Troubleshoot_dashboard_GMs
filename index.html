@@ -327,7 +327,7 @@ let state = {
   collapsed: {},
   sort: { field: "w1Pnl", dir: "asc" },
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
-  moveWeek: null, moveGm: null, moveQ: "", moveSort: { field: "name", dir: "asc" },
+  moveWeek: null, moveGm: null, moveQ: "", moveRto: "all", moveSort: { field: "name", dir: "asc" },
 };
 
 function sortRows(rows, field, dir, accessor){
@@ -395,7 +395,11 @@ function flattenSnapshot(gmDocs){
     (d.sellers||[]).forEach(s=> sellers.push(s));
     if(d.updatedAt && (!latest || d.updatedAt > latest)) latest = d.updatedAt;
   });
-  sellers.forEach(s=>{ s.tsEligType = eligType(s); s.autoTag = !!s.autoTag; s.countedInCompliance = !!(s.eligible && s.tsDone); });
+  sellers.forEach(s=>{
+    s.tsEligType = eligType(s); s.autoTag = !!s.autoTag; s.countedInCompliance = !!(s.eligible && s.tsDone);
+    if(s.hasManualTs === undefined) s.hasManualTs = s.tsType === "manual_ts";
+    if(s.hasAutoTs === undefined) s.hasAutoTs = s.tsType === "auto_ts";
+  });
   SELLERS = sellers;
   GM_LIST = [...gms].sort((a,b)=>a.localeCompare(b));
   LAST_REFRESH = latest;
@@ -491,8 +495,8 @@ document.getElementById("appRoot").addEventListener("click", e=>{
       const rows = window._complianceRowsForExport || [];
       downloadCsv(`compliance_by_gm_${state.complianceWeek||"week"}.csv`, rows, [
         {key:"gm",label:"GM"},{key:"eligible",label:"Total Eligible"},{key:"done",label:"Total Done"},{key:"rate",label:"Total Compliance %"},
-        {key:"autoEligible",label:"Auto Eligible"},{key:"autoDone",label:"Auto Done"},{key:"autoRate",label:"Auto Compliance %"},
-        {key:"manualEligible",label:"Manual Eligible"},{key:"manualDone",label:"Manual Done"},{key:"manualRate",label:"Manual Compliance %"},
+        {key:"autoEligible",label:"Auto Eligible"},{key:"autoDone",label:"Auto TS Done"},{key:"autoRate",label:"Auto Compliance %"},
+        {key:"manualEligible",label:"Manual Eligible"},{key:"manualDone",label:"Manual Done"},{key:"manualOnAuto",label:"GM TS On Auto-Eligible"},{key:"manualRate",label:"Manual Compliance %"},
         {key:"gmPending",label:"GM Pending"},{key:"doneManual",label:"Done via Manual TS"},{key:"doneAuto",label:"Done via Auto TS"},
       ]);
     } else if(kind === "zero-gmv-compliance"){
@@ -553,8 +557,8 @@ function queueTemplate(){
       <button class="x" id="caveatClose">&times;</button>
       <b>How to read this:</b> PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
       RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log. For Objective Hit, Potential, Breakeven Potential, and Bucket Health specifically, an auto-TS alone does NOT count as done — a manual TS is required from the GM; such accounts show as Pending with a note even if Hitesh Agarwal's auto-TS already ran.
-      <b>Auto vs manual:</b> eligible sellers tagged <i>auto</i> in the auto-TS program (Metabase 9963) are <b>auto-eligible</b> (marked AUTO-ELIGIBLE) and are not counted as GM pending — except in the four buckets above, which stay manual. A TS logged on a seller who isn't TS-eligible is never counted in compliance.
-      <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Its current cohort is the most recent one available; this week's batch appears here once it's created.
+      <b>Auto vs manual:</b> eligible sellers tagged <i>auto</i> in the auto-TS program (Metabase 9963) are <b>auto-eligible</b> (marked AUTO-ELIGIBLE) and are not counted as GM pending — except in the four buckets above, which stay manual. A TS logged on a seller who isn't TS-eligible is never counted in compliance. <b>Auto compliance</b> = auto-eligible sellers with an auto TS ÷ auto-eligible. <b>Manual compliance</b> = (manual-eligible sellers done + auto-eligible sellers the GM also troubleshot manually) ÷ manual-eligible.
+      <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Only tasks <b>scheduled on this week's Monday</b> are included — tasks created later in the week are not part of it.
     </div>
     <div class="stats" id="statsRow"></div>
     <div class="controls">
@@ -611,15 +615,16 @@ function renderQueueStats(){
   const doneAuto = done.filter(s=>s.tsType==="auto_ts").length;
   const autoE = eligible.filter(s=>eligType(s)==="auto");
   const manE = eligible.filter(s=>eligType(s)==="manual");
-  const autoD = autoE.filter(s=>s.tsDone).length;
+  const autoD = autoE.filter(s=>s.hasAutoTs).length;
   const manD = manE.filter(s=>s.tsDone).length;
+  const manOnAuto = autoE.filter(s=>s.hasManualTs).length;
   const pctTxt = (a,b)=>{ const p = pctOrNull(a,b); return p==null ? "—" : p+"%"; };
   const tiles = [
     {n:eligible.length, l:"Eligible for TS", cap:`${autoE.length} auto · ${manE.length} manual — ${state.gm || "All GMs"}`},
     {n:pctTxt(done.length, eligible.length), l:"Overall compliance", cap:`${done.length}/${eligible.length} done · ${doneManual} manual TS · ${doneAuto} auto TS`},
-    {n:pctTxt(manD, manE.length), l:"Manual (GM) compliance", cap:`${manD}/${manE.length} done`},
-    {n:pctTxt(autoD, autoE.length), l:"Auto compliance", cap:`${autoD}/${autoE.length} done`},
-    {n:manE.length-manD, l:"GM pending", cap:`+ ${autoE.length-autoD} auto pending (not on GM)`},
+    {n:pctTxt(manD+manOnAuto, manE.length), l:"Manual (GM) compliance", cap:`(${manD} + ${manOnAuto} GM TS on auto-eligible) / ${manE.length}`},
+    {n:pctTxt(autoD, autoE.length), l:"Auto compliance", cap:`${autoD}/${autoE.length} auto TS done`},
+    {n:manE.length-manD, l:"GM pending", cap:`+ ${autoE.length-autoD} awaiting auto TS (not on GM)`},
   ];
   const el = document.getElementById("statsRow");
   if(el) el.innerHTML = tiles.map(t=>`<div class="stat-tile"><div class="n mono">${t.n}</div><div class="l">${t.l}</div>${t.cap?`<div class="cap">${t.cap}</div>`:""}</div>`).join("");
@@ -882,21 +887,22 @@ const COMPLIANCE_SORT_COLS = [
   {key:"gm", label:"GM"},
   {key:"eligible", label:"Eligible"}, {key:"done", label:"Done"}, {key:"rate", label:"Compliance"},
   {key:"autoEligible", label:"Eligible"}, {key:"autoDone", label:"Done"}, {key:"autoRate", label:"Compliance"},
-  {key:"manualEligible", label:"Eligible"}, {key:"manualDone", label:"Done"}, {key:"manualRate", label:"Compliance"},
+  {key:"manualEligible", label:"Eligible"}, {key:"manualDone", label:"Done"}, {key:"manualOnAuto", label:"+ GM TS on auto"}, {key:"manualRate", label:"Compliance"},
   {key:"gmPending", label:"GM Pending"},
 ];
 function complianceRowFromGm(g){
   const split = g.autoEligible != null;
   return {...g, doneManual: g.doneManual||0, doneAuto: g.doneAuto||0, pending: g.eligible-g.done, rate: g.eligible ? Math.round(g.done/g.eligible*100) : 0,
     autoEligible: split ? g.autoEligible : null, autoDone: split ? g.autoDone : null, autoRate: split ? pctOrNull(g.autoDone, g.autoEligible) : null,
-    manualEligible: split ? g.manualEligible : null, manualDone: split ? g.manualDone : null, manualRate: split ? pctOrNull(g.manualDone, g.manualEligible) : null,
+    manualEligible: split ? g.manualEligible : null, manualDone: split ? g.manualDone : null, manualOnAuto: split ? (g.manualOnAuto ?? 0) : null,
+    manualRate: split ? pctOrNull(g.manualDone + (g.manualOnAuto ?? 0), g.manualEligible) : null,
     gmPending: split ? g.manualEligible - g.manualDone : null};
 }
 function complianceRowHtml(g, cls){
   return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(g.gm)}</td>
     <td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td>${rateCell(g.rate)}</td>
     <td>${numCell(g.autoEligible)}</td><td>${numCell(g.autoDone)}</td><td>${rateCell(g.autoRate)}</td>
-    <td>${numCell(g.manualEligible)}</td><td>${numCell(g.manualDone)}</td><td>${rateCell(g.manualRate)}</td>
+    <td>${numCell(g.manualEligible)}</td><td>${numCell(g.manualDone)}</td><td>${numCell(g.manualOnAuto)}</td><td>${rateCell(g.manualRate)}</td>
     <td>${numCell(g.gmPending)}</td></tr>`;
 }
 const BREAKDOWN_BUCKETS = ["objective_hit","potential","breakeven_potential","bucket_health","rest_ts_pending"];
@@ -915,7 +921,8 @@ function renderCompliance(){
   const sumOr = (docKey, rowKey)=> doc[docKey]!=null ? doc[docKey] : (hasSplit ? rows.reduce((a,g)=>a+g[rowKey],0) : null);
   const totalRow = complianceRowFromGm({gm:"All GMs (Overall)", eligible: doc.totalEligible, done: doc.totalDone,
     autoEligible: sumOr("totalAutoEligible","autoEligible"), autoDone: sumOr("totalAutoDone","autoDone"),
-    manualEligible: sumOr("totalManualEligible","manualEligible"), manualDone: sumOr("totalManualDone","manualDone")});
+    manualEligible: sumOr("totalManualEligible","manualEligible"), manualDone: sumOr("totalManualDone","manualDone"),
+    manualOnAuto: sumOr("totalManualOnAuto","manualOnAuto")});
   const tileRate = r=> r==null ? "—" : r+"%";
 
   // live bucket breakdown by GM (from current SELLERS, not the frozen weekly doc)
@@ -932,15 +939,15 @@ function renderCompliance(){
     <div class="stats">
       <div class="stat-tile"><div class="n mono">${doc.totalEligible}</div><div class="l">Total Eligible</div><div class="cap">${hasSplit ? `${totalRow.autoEligible} auto · ${totalRow.manualEligible} manual` : escapeHtml(doc.dateRange||'')}</div></div>
       <div class="stat-tile"><div class="n mono">${overallRate}%</div><div class="l">Overall Compliance</div><div class="cap">${doc.totalDone}/${doc.totalEligible} done · ${totalDoneManual} manual TS · ${totalDoneAuto} auto TS</div></div>
-      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.manualRate)}</div><div class="l">Manual (GM) Compliance</div><div class="cap">${hasSplit ? `${totalRow.manualDone}/${totalRow.manualEligible} done` : 'not tracked this week'}</div></div>
-      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.autoRate)}</div><div class="l">Auto Compliance</div><div class="cap">${hasSplit ? `${totalRow.autoDone}/${totalRow.autoEligible} done` : 'not tracked this week'}</div></div>
-      <div class="stat-tile"><div class="n mono">${hasSplit ? totalRow.gmPending : doc.totalEligible-doc.totalDone}</div><div class="l">${hasSplit ? 'GM Pending' : 'Total Pending'}</div><div class="cap">${hasSplit ? `+ ${totalRow.autoEligible-totalRow.autoDone} auto pending (not on GM)` : ''}</div></div>
+      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.manualRate)}</div><div class="l">Manual (GM) Compliance</div><div class="cap">${hasSplit ? `(${totalRow.manualDone} + ${totalRow.manualOnAuto} GM TS on auto-eligible) / ${totalRow.manualEligible}` : 'not tracked this week'}</div></div>
+      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.autoRate)}</div><div class="l">Auto Compliance</div><div class="cap">${hasSplit ? `${totalRow.autoDone}/${totalRow.autoEligible} auto TS done` : 'not tracked this week'}</div></div>
+      <div class="stat-tile"><div class="n mono">${hasSplit ? totalRow.gmPending : doc.totalEligible-doc.totalDone}</div><div class="l">${hasSplit ? 'GM Pending' : 'Total Pending'}</div><div class="cap">${hasSplit ? `+ ${totalRow.autoEligible-totalRow.autoDone} awaiting auto TS (not on GM)` : ''}</div></div>
     </div>
     <div class="card">
       <h2 class="card-head-row">Compliance by GM — ${escapeHtml(doc.weekLabel)} <button class="btn-download-sm" data-download="compliance-leaderboard" title="Download as CSV">⬇ CSV</button></h2>
       <div class="table-scroll"><table class="simple">
         <thead>
-          <tr><th class="grp"></th><th class="grp" colspan="3">Total eligible</th><th class="grp" colspan="3">Auto-eligible</th><th class="grp" colspan="3">Manual-eligible (GM)</th><th class="grp"></th></tr>
+          <tr><th class="grp"></th><th class="grp" colspan="3">Total eligible</th><th class="grp" colspan="3">Auto-eligible</th><th class="grp" colspan="4">Manual-eligible (GM)</th><th class="grp"></th></tr>
           <tr>${COMPLIANCE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable">${c.label}${sortArrow(c.key, state.complianceSort)}</th>`).join("")}</tr>
         </thead>
         <tbody>
@@ -1031,6 +1038,52 @@ function openBucketList(gmName, bucketKey){
 }
 
 // ================= MOVEMENT TAB =================
+const RTO_ALERT_PTS = 10;
+const RTO_CMP_FIELDS = {rtoBase:"base", rtoLatest:"latest", rtoDelta:"delta"};
+function isoWeekKeyOf(d){
+  const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+  const day = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y = t.getUTCFullYear();
+  const w = Math.ceil(((t - Date.UTC(y,0,1)) / 86400000 + 1) / 7);
+  return `w${y}-${String(w).padStart(2,"0")}`;
+}
+function prevWeekKeys(wk, n){
+  const m = /^w(\d{4})-(\d{2})$/.exec(wk); if(!m) return [];
+  const y = +m[1], w = +m[2];
+  const jan4 = new Date(Date.UTC(y,0,4));
+  const mon = new Date(jan4); mon.setUTCDate(jan4.getUTCDate() - ((jan4.getUTCDay()||7) - 1) + (w-1)*7);
+  const out = [];
+  for(let i=1;i<=n;i++){ const d = new Date(mon); d.setUTCDate(mon.getUTCDate() - 7*i); out.push(isoWeekKeyOf(d)); }
+  return out;
+}
+// Latest RTO reading for the tracked week vs the average of the two weeks before it.
+function rtoVsAvg(s, wk){
+  const obs = (s.movement && s.movement[wk]) || [];
+  const last = obs.length ? obs[obs.length-1] : null;
+  const latest = last && last.rto != null ? last.rto : null;
+  // A prior week only counts toward the baseline if that week's spend was above ₹1,000.
+  const prev = prevWeekKeys(wk, 2)
+    .filter(k=> s.spendWeekly && s.spendWeekly[k] != null && s.spendWeekly[k] > 1000)
+    .map(k=> s.rtoWeekly ? s.rtoWeekly[k] : null).filter(v=> v != null);
+  const base = prev.length ? prev.reduce((a,b)=>a+b,0)/prev.length : null;
+  const delta = (latest != null && base != null) ? latest - base : null;
+  const flag = delta == null ? null : delta >= RTO_ALERT_PTS ? "spike" : delta <= -RTO_ALERT_PTS ? "drop" : "ok";
+  return {latest, base, delta, flag, baseWeeks: prev.length};
+}
+function rtoCmpCellsHtml(c){
+  const baseHtml = c.base != null ? `<span class="mono" title="Average of ${c.baseWeeks} prior week${c.baseWeeks===1?'':'s'} with spend above ₹1,000">${c.base.toFixed(1)}%${c.baseWeeks===1?'<sup class="rto-src">1wk</sup>':''}</span>` : '<span class="na">—</span>';
+  const latestHtml = c.latest != null ? `<span class="mono">${c.latest.toFixed(1)}%</span>` : '<span class="na">—</span>';
+  let deltaHtml = '<span class="na">—</span>';
+  if(c.delta != null){
+    const sign = c.delta > 0 ? "+" : c.delta < 0 ? "−" : "";
+    const txt = `${sign}${Math.abs(c.delta).toFixed(1)} pts`;
+    deltaHtml = c.flag==="spike" ? `<span class="clr-red mono">▲ ${txt}</span><div class="ts-meta">spike — problem</div>`
+      : c.flag==="drop" ? `<span class="clr-green mono">▼ ${txt}</span><div class="ts-meta">improved</div>`
+      : `<span class="mono">• ${txt}</span><div class="ts-meta">in line</div>`;
+  }
+  return `<td>${baseHtml}</td><td>${latestHtml}</td><td>${deltaHtml}</td>`;
+}
 function movementTemplate(){
   const weekKeySet = new Set();
   SELLERS.forEach(s=> Object.keys(s.movement||{}).forEach(k=>weekKeySet.add(k)));
@@ -1041,10 +1094,16 @@ function movementTemplate(){
     <div class="caveat">
       <b>What this tracks:</b> RTO% and PNL% for a given tracked week keep settling for several days after the week ends (more returns get confirmed). Each day this refreshes, a new column is added here so you can see a seller drift between buckets as its numbers finalize. Tracking starts today — history builds forward from here.
       Only sellers with ≥₹3,000 marketing spend for that specific week are shown.
+      <b>RTO vs 2-week average:</b> each seller's latest RTO for the selected week is compared with the average RTO of the two weeks before it. A prior week with ₹1,000 or less spend is left out of that average (marked <sup class="rto-src">1wk</sup> when only one week counts; "—" when neither does). A rise of <b>10+ points</b> is flagged red (problem), a fall of 10+ points green; anything within ±10 is in line. It's re-checked every day, so a flag clears by itself if RTO settles back by the end of the week.
     </div>
     <div class="controls">
       <select class="field" id="moveWeekSel">${opts || '<option>No data yet</option>'}</select>
       <select class="field" id="moveGmSel"><option value="">All GMs</option>${GM_LIST.map(g=>`<option value="${escapeHtml(g)}" ${state.moveGm===g?'selected':''}>${escapeHtml(g)}</option>`).join("")}</select>
+      <div class="seg" id="moveRtoSeg">
+        <button data-v="all" class="${state.moveRto==='all'?'active':''}">All</button>
+        <button data-v="spike" class="${state.moveRto==='spike'?'active':''}">RTO spike (+10)</button>
+        <button data-v="drop" class="${state.moveRto==='drop'?'active':''}">RTO drop (−10)</button>
+      </div>
       <input class="search" id="moveSearch" type="text" placeholder="Search seller name or ID…" value="${escapeHtml(state.moveQ)}">
       <button class="btn-download" data-download="movement" title="Download the current movement view as CSV">⬇ CSV</button>
     </div>
@@ -1075,7 +1134,15 @@ function renderMovementTable(){
     return;
   }
 
-  rows = sortRows(rows, state.moveSort.field, state.moveSort.dir, (s,f)=> f==="bucket" ? (BUCKET_META[s.bucket]?BUCKET_META[s.bucket].label:null) : s[f]);
+  const rtoCmp = new Map(rows.map(s=>[s.id, rtoVsAvg(s, wk)]));
+  if(state.moveRto==="spike") rows = rows.filter(s=> rtoCmp.get(s.id).flag==="spike");
+  else if(state.moveRto==="drop") rows = rows.filter(s=> rtoCmp.get(s.id).flag==="drop");
+  if(!rows.length){
+    wrap.innerHTML = `<div class="empty-bucket">No sellers match this RTO filter for the selected week.</div>`;
+    window._movementRowsForExport = []; window._movementColsForExport = [];
+    return;
+  }
+  rows = sortRows(rows, state.moveSort.field, state.moveSort.dir, (s,f)=> f==="bucket" ? (BUCKET_META[s.bucket]?BUCKET_META[s.bucket].label:null) : (f in RTO_CMP_FIELDS ? rtoCmp.get(s.id)[RTO_CMP_FIELDS[f]] : s[f]));
 
   const dateSet = new Set();
   rows.forEach(s=> s.movement[wk].forEach(o=>dateSet.add(o.date)));
@@ -1085,21 +1152,26 @@ function renderMovementTable(){
   const exportCols = [
     {key:"id",label:"Seller ID"},{key:"name",label:"Seller Name"},{key:"gm",label:"GM"},
     {key:"bestSource",label:"Source"},{key:"bucketLabel",label:"Bucket"},
+    {key:"rtoBase",label:"2-Wk Avg RTO%"},{key:"rtoLatest",label:"Latest RTO%"},{key:"rtoDelta",label:"RTO Delta (pts)"},{key:"rtoFlag",label:"RTO Flag"},
   ];
   dates.forEach(d=>{ exportCols.push({key:"rto_"+d,label:d+" RTO%"}); exportCols.push({key:"pnl_"+d,label:d+" PNL%"}); });
   const exportRows = rows.map(s=>{
     const byDate = {}; s.movement[wk].forEach(o=> byDate[o.date]=o);
-    const r = {id:s.id, name:s.name, gm:s.gm, bestSource:s.bestSource, bucketLabel: BUCKET_META[s.bucket]?BUCKET_META[s.bucket].label:""};
+    const c = rtoCmp.get(s.id);
+    const r = {id:s.id, name:s.name, gm:s.gm, bestSource:s.bestSource, bucketLabel: BUCKET_META[s.bucket]?BUCKET_META[s.bucket].label:"",
+      rtoBase: c.base!=null ? +c.base.toFixed(2) : "", rtoLatest: c.latest!=null ? c.latest : "", rtoDelta: c.delta!=null ? +c.delta.toFixed(2) : "",
+      rtoFlag: c.flag==="spike" ? "Spike (problem)" : c.flag==="drop" ? "Drop" : c.flag==="ok" ? "In line" : "No baseline"};
     dates.forEach(d=>{ const o=byDate[d]; r["rto_"+d]= o&&o.rto!=null?o.rto:""; r["pnl_"+d]= o&&o.pnl!=null?o.pnl:""; });
     return r;
   });
   window._movementRowsForExport = exportRows;
   window._movementColsForExport = exportCols;
 
-  const MOVE_SORT_COLS = [{key:"name",label:"Seller"},{key:"gm",label:"GM"},{key:"bestSource",label:"Source"},{key:"bucket",label:"Bucket"}];
+  const MOVE_SORT_COLS = [{key:"name",label:"Seller"},{key:"gm",label:"GM"},{key:"bestSource",label:"Source"},{key:"bucket",label:"Bucket"},
+    {key:"rtoBase",label:"2-wk avg RTO"},{key:"rtoLatest",label:"Latest RTO"},{key:"rtoDelta",label:"Δ vs avg"}];
   wrap.innerHTML = `<table class="movement">
     <thead><tr>${MOVE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable">${c.label}${sortArrow(c.key, state.moveSort)}</th>`).join("")}${dates.map(d=>`<th class="daycol" colspan="2">${fmtDateLabel(d)}</th>`).join("")}</tr>
-    <tr><th></th><th></th><th></th><th></th>${dates.map(()=>`<th class="daycol">RTO%</th><th class="daycol">PNL%</th>`).join("")}</tr></thead>
+    <tr><th></th><th></th><th></th><th></th><th></th><th></th><th></th>${dates.map(()=>`<th class="daycol">RTO%</th><th class="daycol">PNL%</th>`).join("")}</tr></thead>
     <tbody>
       ${rows.map(s=>{
         const byDate = {};
@@ -1111,6 +1183,7 @@ function renderMovementTable(){
           <td>${escapeHtml(s.gm)}</td>
           <td><span class="src-tag">${escapeHtml(s.bestSource)}</span></td>
           <td>${bucketBadge}</td>
+          ${rtoCmpCellsHtml(rtoCmp.get(s.id))}
           ${dates.map((d,di)=>{
             const o = byDate[d];
             const prevO = di>0 ? byDate[dates[di-1]] : null;
@@ -1129,6 +1202,13 @@ function wireMovementTab(){
   const s1 = document.getElementById("moveWeekSel"); if(s1) s1.onchange = e=>{ state.moveWeek = e.target.value; renderMovementTable(); };
   const s2 = document.getElementById("moveGmSel"); if(s2) s2.onchange = e=>{ state.moveGm = e.target.value || null; renderMovementTable(); };
   const s3 = document.getElementById("moveSearch"); if(s3) s3.oninput = e=>{ state.moveQ = e.target.value; renderMovementTable(); };
+  const s4 = document.getElementById("moveRtoSeg"); if(s4) s4.addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    s4.querySelectorAll("button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    state.moveRto = b.dataset.v;
+    renderMovementTable();
+  });
 }
 
 // ================= ROSTER CHANGES TAB =================
