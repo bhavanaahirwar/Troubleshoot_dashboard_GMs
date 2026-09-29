@@ -249,6 +249,12 @@
   table.movement{ font-size:11px; }
   table.movement th, table.movement td{ padding:5px 8px; }
   .owner-bar{ justify-content:space-between; }
+  details.caveat summary{ cursor:pointer; color:var(--text); list-style:none; user-select:none; }
+  details.caveat summary::-webkit-details-marker{ display:none; }
+  details.caveat summary::before{ content:"▸"; display:inline-block; margin-right:6px; color:var(--accent); transition:transform .15s; }
+  details.caveat[open] summary::before{ transform:rotate(90deg); }
+  details.caveat[open] summary .ts-meta{ display:none; }
+  details.caveat .caveat-body{ margin-top:6px; }
   table.simple th, table.simple td{ text-align:center; }
   table.simple th:first-child, table.simple td:first-child{ text-align:left; }
   table.simple th.grp{ text-align:center; }
@@ -630,13 +636,14 @@ function renderTab(){
 // ================= QUEUE TAB =================
 function queueTemplate(){
   return `
-    <div class="caveat" id="caveatBox">
-      <button class="x" id="caveatClose">&times;</button>
-      <b>How to read this:</b> PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
+    <details class="caveat" id="caveatBox">
+      <summary><b>How to read this</b> <span class="ts-meta">— click to open</span></summary>
+      <div class="caveat-body">PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
       RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log. For Objective Hit, Potential, Breakeven Potential, and Bucket Health specifically, an auto-TS alone does NOT count as done — a manual TS is required from the GM; such accounts show as Pending with a note even if Hitesh Agarwal's auto-TS already ran.
       <b>Auto vs manual:</b> eligible sellers tagged <i>auto</i> in the auto-TS program (Metabase 9963) are <b>auto-eligible</b> (marked AUTO-ELIGIBLE) and are not counted as GM pending — except in the four buckets above, which stay manual. A TS logged on a seller who isn't TS-eligible is never counted in compliance. <b>Auto compliance</b> = auto-eligible sellers with an auto TS ÷ auto-eligible. <b>Manual TS compliance</b> = manual-eligible sellers done ÷ manual-eligible. <b>Total compliance of GM</b> = (manual-eligible done + auto-eligible sellers the GM also troubleshot) ÷ manual-eligible.
       <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Only tasks <b>scheduled on this week's Monday</b> are included — tasks created later in the week are not part of it. Zero GMV sellers always need a <b>manual TS from the GM</b> (an auto TS alone doesn't count), and they're counted in the main totals as manual-eligible. Each Zero GMV seller is listed only in the Zero GMV section (not again in its PNL bucket), so the sections add up to the GM's pending count.
-    </div>
+      </div>
+    </details>
     <div class="stats" id="statsRow"></div>
     <div class="controls">
       <div class="seg" id="scopeSeg">
