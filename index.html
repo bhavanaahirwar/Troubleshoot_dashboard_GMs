@@ -249,6 +249,15 @@
   table.movement{ font-size:11px; }
   table.movement th, table.movement td{ padding:5px 8px; }
   .owner-bar{ justify-content:space-between; }
+  table.simple th, table.simple td{ text-align:center; }
+  table.simple th:first-child, table.simple td:first-child{ text-align:left; }
+  table.simple th.grp{ text-align:center; }
+  table.simple td.gm-total{ font-weight:700; background:color-mix(in srgb, var(--accent-soft) 60%, transparent); }
+  table.movement th, table.movement td{ text-align:center; }
+  table.movement th:nth-child(-n+2), table.movement td:nth-child(-n+2){ text-align:left; }
+  .row-head > div:nth-child(n+4), .row > div:nth-child(n+4){ text-align:center; }
+  .stat-tile{ text-align:center; }
+  @media (max-width:980px){ .row > div:nth-child(n+4){ text-align:left; } }
   @media (max-width:980px){ .stats{ grid-template-columns:repeat(2,1fr); } }
 </style>
 </head>
@@ -512,7 +521,7 @@ document.getElementById("appRoot").addEventListener("click", e=>{
   if(dlBucketEl){
     const bk = dlBucketEl.dataset.downloadBucket;
     const bkMeta = BUCKET_META[bk];
-    const bkPred = bkMeta.isZeroGmv ? (s=>s.zeroGmv && s.zeroGmv.isZeroGmv) : (s=>s.bucket===bk);
+    const bkPred = bkMeta.isZeroGmv ? (s=>isZG(s)) : (s=>s.bucket===bk && !isZG(s));
     const rows = sortRows(SELLERS.filter(s=>passesFilter(s, !!bkMeta.isZeroGmv) && bkPred(s)), state.sort.field, state.sort.dir);
     const cols = [
       {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"company",label:"Company"},
@@ -556,7 +565,7 @@ document.getElementById("appRoot").addEventListener("click", e=>{
       const rows = window._complianceRowsForExport || [];
       downloadCsv(`compliance_by_gm_${state.complianceWeek||"week"}.csv`, rows, [
         {key:"gm",label:"GM names"},{key:"eligible",label:"Total eligible sellers for TS"},{key:"done",label:"Total TS done till now"},{key:"rate",label:"Total compliance %"},
-        {key:"manualEligible",label:"Total manual TS eligible"},{key:"manualDone",label:"TS done by GM - out of manual eligible"},{key:"manualOnAuto",label:"TS done by GM - out of auto eligible"},
+        {key:"manualEligible",label:"Total manual TS eligible"},{key:"gmDone",label:"Total TS done by GM"},{key:"manualDone",label:"TS done by GM - out of manual eligible"},{key:"manualOnAuto",label:"TS done by GM - out of auto eligible"},
         {key:"manualRate",label:"Manual TS compliance %"},{key:"gmRate",label:"Total compliance of GM %"},{key:"gmPending",label:"Pending TS for GM"},
         {key:"autoEligible",label:"Total auto TS eligible"},{key:"autoDone",label:"Total auto TS done"},{key:"autoRate",label:"Auto TS compliance %"},
       ]);
@@ -626,7 +635,7 @@ function queueTemplate(){
       <b>How to read this:</b> PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
       RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log. For Objective Hit, Potential, Breakeven Potential, and Bucket Health specifically, an auto-TS alone does NOT count as done — a manual TS is required from the GM; such accounts show as Pending with a note even if Hitesh Agarwal's auto-TS already ran.
       <b>Auto vs manual:</b> eligible sellers tagged <i>auto</i> in the auto-TS program (Metabase 9963) are <b>auto-eligible</b> (marked AUTO-ELIGIBLE) and are not counted as GM pending — except in the four buckets above, which stay manual. A TS logged on a seller who isn't TS-eligible is never counted in compliance. <b>Auto compliance</b> = auto-eligible sellers with an auto TS ÷ auto-eligible. <b>Manual TS compliance</b> = manual-eligible sellers done ÷ manual-eligible. <b>Total compliance of GM</b> = (manual-eligible done + auto-eligible sellers the GM also troubleshot) ÷ manual-eligible.
-      <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Only tasks <b>scheduled on this week's Monday</b> are included — tasks created later in the week are not part of it. Zero GMV sellers always need a <b>manual TS from the GM</b> (an auto TS alone doesn't count), and they're counted in the main totals as manual-eligible.
+      <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Only tasks <b>scheduled on this week's Monday</b> are included — tasks created later in the week are not part of it. Zero GMV sellers always need a <b>manual TS from the GM</b> (an auto TS alone doesn't count), and they're counted in the main totals as manual-eligible. Each Zero GMV seller is listed only in the Zero GMV section (not again in its PNL bucket), so the sections add up to the GM's pending count.
     </div>
     <div class="stats" id="statsRow"></div>
     <div class="controls">
@@ -794,7 +803,7 @@ function renderBuckets(){
     const meta = BUCKET_META[bk];
     const unsorted = meta.isZeroGmv
       ? SELLERS.filter(s=>isZG(s) && passesFilter(s, true))
-      : SELLERS.filter(s=>s.bucket===bk && passesFilter(s, false));
+      : SELLERS.filter(s=>s.bucket===bk && !isZG(s) && passesFilter(s, false));
     const rows = sortRows(unsorted, state.sort.field, state.sort.dir);
     const collapsed = state.collapsed[bk] ? "collapsed" : "";
     return `<div class="bucket ${collapsed}" data-bucket="${bk}">
@@ -955,7 +964,7 @@ function complianceTemplate(){
 const COMPLIANCE_SORT_COLS = [
   {key:"gm", label:"GM names"},
   {key:"eligible", label:"Total eligible sellers for TS"}, {key:"done", label:"Total TS done till now"}, {key:"rate", label:"Total compliance"},
-  {key:"manualEligible", label:"Total manual TS eligible", sep:true}, {key:"manualDone", label:"Out of manual eligible"}, {key:"manualOnAuto", label:"Out of auto eligible"},
+  {key:"manualEligible", label:"Total manual TS eligible", sep:true}, {key:"gmDone", label:"Total"}, {key:"manualDone", label:"Out of manual eligible"}, {key:"manualOnAuto", label:"Out of auto eligible"},
   {key:"manualRate", label:"Manual TS compliance"}, {key:"gmRate", label:"Total compliance of GM"}, {key:"gmPending", label:"Pending TS for GM"},
   {key:"autoEligible", label:"Total auto TS eligible", sep:true}, {key:"autoDone", label:"Total auto TS done"}, {key:"autoRate", label:"Auto TS compliance"},
 ];
@@ -965,6 +974,7 @@ function complianceRowFromGm(g){
   const onAuto = split ? (g.manualOnAuto ?? 0) : null;
   return {...g, doneManual: g.doneManual||0, doneAuto: g.doneAuto||0, pending: g.eligible-g.done, rate: g.eligible ? Math.round(g.done/g.eligible*100) : 0,
     manualEligible: split ? g.manualEligible : null, manualDone: split ? g.manualDone : null, manualOnAuto: onAuto,
+    gmDone: split ? g.manualDone + onAuto : null,
     manualRate: split ? pctOrNull(g.manualDone, g.manualEligible) : null,
     gmRate: split ? pctOrNull(g.manualDone + onAuto, g.manualEligible) : null,
     autoEligible: split ? g.autoEligible : null, autoDone: split ? g.autoDone : null, autoRate: split ? pctOrNull(g.autoDone, g.autoEligible) : null,
@@ -973,7 +983,7 @@ function complianceRowFromGm(g){
 function complianceRowHtml(g, cls){
   return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(g.gm)}</td>
     <td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td>${rateCell(g.rate)}</td>
-    <td class="grp-sep">${numCell(g.manualEligible)}</td><td>${numCell(g.manualDone)}</td><td>${numCell(g.manualOnAuto)}</td>
+    <td class="grp-sep">${numCell(g.manualEligible)}</td><td class="gm-total">${numCell(g.gmDone)}</td><td>${numCell(g.manualDone)}</td><td>${numCell(g.manualOnAuto)}</td>
     <td>${rateCell(g.manualRate)}</td><td>${rateCell(g.gmRate)}</td><td>${pendCell(g.gmPending)}</td>
     <td class="grp-sep">${numCell(g.autoEligible)}</td><td>${numCell(g.autoDone)}</td><td>${rateCell(g.autoRate)}</td></tr>`;
 }
@@ -1020,7 +1030,7 @@ function renderCompliance(){
       <h2 class="card-head-row">Compliance by GM — ${escapeHtml(doc.weekLabel)} <button class="btn-download-sm" data-download="compliance-leaderboard" title="Download as CSV">⬇ CSV</button></h2>
       <div class="table-scroll"><table class="simple">
         <thead>
-          <tr><th class="grp" colspan="5"></th><th class="grp band" colspan="2">Total TS done by GM</th><th class="grp" colspan="6"></th></tr>
+          <tr><th class="grp" colspan="5"></th><th class="grp band" colspan="3">Total TS done by GM</th><th class="grp" colspan="6"></th></tr>
           <tr>${COMPLIANCE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable${c.sep?' grp-sep':''}">${c.label}${sortArrow(c.key, state.complianceSort)}</th>`).join("")}</tr>
         </thead>
         <tbody>
