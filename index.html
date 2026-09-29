@@ -71,7 +71,7 @@
   .tabs button{ border:none; background:none; padding:10px 14px; font-size:13px; font-weight:600; color:var(--text-muted); white-space:nowrap; border-bottom:2px solid transparent; margin-bottom:-1px; }
   .tabs button.active{ color:var(--accent); border-bottom-color:var(--accent); }
 
-  .stats{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:12px; }
+  .stats{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; margin-bottom:12px; }
   .stat-tile{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:12px 15px; box-shadow:var(--shadow); }
   .stat-tile .n{ font-family:"IBM Plex Mono",monospace; font-size:23px; font-weight:600; letter-spacing:-.02em; }
   .stat-tile .l{ font-size:11px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
@@ -136,6 +136,11 @@
   .status-pill{ font-size:10px; font-weight:700; padding:3px 8px; border-radius:999px; display:inline-flex; align-items:center; gap:4px; white-space:nowrap; }
   .status-pill.done{ background:var(--done-bg); color:var(--done-fg); }
   .status-pill.pending{ background:var(--pending-bg); color:var(--pending-fg); }
+  .status-pill.muted{ background:var(--surface-2); color:var(--text-faint); }
+  .elig-tag{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:999px; border:1px solid var(--border); color:var(--text-muted); margin-left:4px; white-space:nowrap; }
+  .table-scroll{ overflow-x:auto; }
+  table.simple td:has(> .rate-bar){ white-space:nowrap; }
+  table.simple th.grp{ text-align:center; border-bottom:none; padding-bottom:0; color:var(--text-muted); }
   .ts-type{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:999px; background:var(--auto-bg); color:var(--auto-fg); margin-left:4px; }
   .ts-meta{ font-size:9.5px; color:var(--text-faint); margin-top:2px; }
   .empty-bucket, .empty-state{ padding:24px; text-align:center; color:var(--text-faint); font-size:12.5px; }
@@ -318,7 +323,7 @@ let db = null;
 
 let state = {
   tab: "queue",
-  scope: "eligible", tsStatus: "pending", gm: null, q: "",
+  scope: "eligible", tsStatus: "pending", tsKind: "all", gm: null, q: "",
   collapsed: {},
   sort: { field: "w1Pnl", dir: "asc" },
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
@@ -345,6 +350,40 @@ function sortArrow(field, current){
 
 let LAST_REFRESH = null;
 
+// Performance buckets always need a manual TS from the GM, even when the seller is tagged auto.
+const MANUAL_REQUIRED_BUCKETS = ["objective_hit","potential","breakeven_potential","bucket_health"];
+function eligType(s){
+  if(s.tsEligType !== undefined) return s.tsEligType;
+  if(!s.eligible) return null;
+  if(MANUAL_REQUIRED_BUCKETS.includes(s.bucket)) return "manual";
+  return s.autoTag ? "auto" : "manual";
+}
+function isZG(s){ return !!(s.zeroGmv && s.zeroGmv.isZeroGmv); }
+function pctOrNull(a, b){ return b ? Math.round(a/b*100) : null; }
+function numCell(v){ return v==null ? '<span class="na">—</span>' : `<span class="mono">${v}</span>`; }
+function rateCell(r){ return r==null ? '<span class="na">—</span>' : `<span class="rate-bar"><div style="width:${r}%"></div></span>${r}%`; }
+function eligLabel(s){
+  const et = eligType(s);
+  if(et==="auto") return "Auto (tagged auto in the auto-TS program)";
+  if(et==="manual") return s.autoTag ? "Manual (GM) — tagged auto, but this bucket needs a manual TS" : "Manual (GM)";
+  return '<span class="na">not eligible — not counted in compliance</span>';
+}
+function tsStatusHtml(s, detail, inZg){
+  const et = inZg ? "manual" : eligType(s);
+  const tag = et==="auto" ? '<span class="elig-tag" title="Tagged auto in the auto-TS program">AUTO-ELIGIBLE</span>' : "";
+  if(!s.eligible && !isZG(s)){
+    if(s.tsType) return `<span class="status-pill muted">Not counted</span><div class="ts-meta">${s.tsType==='auto_ts'?'Auto':'Manual'} TS logged ${escapeHtml(s.tsDate||'')}, but seller isn't TS-eligible this week</div>`;
+    return `<span class="status-pill muted">Not eligible</span>`;
+  }
+  if(s.tsDone){
+    const by = s.tsType==='manual_ts' ? (s.tsBy||'') : 'Hitesh Agarwal';
+    return `<span class="status-pill done">Done${s.tsType==='auto_ts'?'<span class="ts-type">AUTO</span>':''}</span>${tag}<div class="ts-meta">${detail?'by ':''}${escapeHtml(by)}${detail?' on ':' · '}${escapeHtml(s.tsDate||'')}</div>`;
+  }
+  if(s.tsType==='auto_ts') return `<span class="status-pill pending">Pending</span>${tag}<div class="ts-meta">Auto TS done ${escapeHtml(s.tsDate||'')} — ${detail?'this bucket requires a manual TS too':'manual still required'}</div>`;
+  if(et==="auto") return `<span class="status-pill pending">Auto pending</span>${tag}<div class="ts-meta">Awaiting auto TS — not on GM</div>`;
+  return `<span class="status-pill pending">Pending</span>`;
+}
+
 function flattenSnapshot(gmDocs){
   const sellers = [];
   const gms = new Set();
@@ -356,6 +395,7 @@ function flattenSnapshot(gmDocs){
     (d.sellers||[]).forEach(s=> sellers.push(s));
     if(d.updatedAt && (!latest || d.updatedAt > latest)) latest = d.updatedAt;
   });
+  sellers.forEach(s=>{ s.tsEligType = eligType(s); s.autoTag = !!s.autoTag; s.countedInCompliance = !!(s.eligible && s.tsDone); });
   SELLERS = sellers;
   GM_LIST = [...gms].sort((a,b)=>a.localeCompare(b));
   LAST_REFRESH = latest;
@@ -408,13 +448,14 @@ document.getElementById("appRoot").addEventListener("click", e=>{
     const bk = dlBucketEl.dataset.downloadBucket;
     const bkMeta = BUCKET_META[bk];
     const bkPred = bkMeta.isZeroGmv ? (s=>s.zeroGmv && s.zeroGmv.isZeroGmv) : (s=>s.bucket===bk);
-    const rows = sortRows(SELLERS.filter(s=>passesFilter(s) && bkPred(s)), state.sort.field, state.sort.dir);
+    const rows = sortRows(SELLERS.filter(s=>passesFilter(s, !!bkMeta.isZeroGmv) && bkPred(s)), state.sort.field, state.sort.dir);
     const cols = [
       {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"company",label:"Company"},
       {key:"gm",label:"GM"}, {key:"gc",label:"GC"}, {key:"bestSource",label:"Source"},
       {key:"w1Spend",label:"W1 Spend"}, {key:"w1Pnl",label:"W1 PNL %"}, {key:"w2Spend",label:"W2 Spend"},
       {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"}, {key:"l7dMetaSpend",label:"L7D Meta Spend"},
-      {key:"tsDone",label:"TS Done"}, {key:"tsType",label:"TS Type"}, {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"},
+      {key:"tsEligType",label:"TS Eligibility (auto/manual)"}, {key:"autoTag",label:"Tagged Auto"},
+      {key:"tsDone",label:"TS Done"}, {key:"countedInCompliance",label:"Counted In Compliance"}, {key:"tsType",label:"TS Type"}, {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"},
     ];
     const namePart = state.gm ? state.gm.replace(/\s+/g,"_") : "All_GMs";
     downloadCsv(`${bk}_${namePart}.csv`, rows, cols);
@@ -449,7 +490,10 @@ document.getElementById("appRoot").addEventListener("click", e=>{
     if(kind === "compliance-leaderboard"){
       const rows = window._complianceRowsForExport || [];
       downloadCsv(`compliance_by_gm_${state.complianceWeek||"week"}.csv`, rows, [
-        {key:"gm",label:"GM"},{key:"eligible",label:"Eligible"},{key:"done",label:"Done"},{key:"doneManual",label:"Manual"},{key:"doneAuto",label:"Auto"},{key:"pending",label:"Pending"},{key:"rate",label:"Compliance %"},
+        {key:"gm",label:"GM"},{key:"eligible",label:"Total Eligible"},{key:"done",label:"Total Done"},{key:"rate",label:"Total Compliance %"},
+        {key:"autoEligible",label:"Auto Eligible"},{key:"autoDone",label:"Auto Done"},{key:"autoRate",label:"Auto Compliance %"},
+        {key:"manualEligible",label:"Manual Eligible"},{key:"manualDone",label:"Manual Done"},{key:"manualRate",label:"Manual Compliance %"},
+        {key:"gmPending",label:"GM Pending"},{key:"doneManual",label:"Done via Manual TS"},{key:"doneAuto",label:"Done via Auto TS"},
       ]);
     } else if(kind === "zero-gmv-compliance"){
       const rows = window._zeroGmvRowsForExport || [];
@@ -509,6 +553,7 @@ function queueTemplate(){
       <button class="x" id="caveatClose">&times;</button>
       <b>How to read this:</b> PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
       RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log. For Objective Hit, Potential, Breakeven Potential, and Bucket Health specifically, an auto-TS alone does NOT count as done — a manual TS is required from the GM; such accounts show as Pending with a note even if Hitesh Agarwal's auto-TS already ran.
+      <b>Auto vs manual:</b> eligible sellers tagged <i>auto</i> in the auto-TS program (Metabase 9963) are <b>auto-eligible</b> (marked AUTO-ELIGIBLE) and are not counted as GM pending — except in the four buckets above, which stay manual. A TS logged on a seller who isn't TS-eligible is never counted in compliance.
       <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Its current cohort is the most recent one available; this week's batch appears here once it's created.
     </div>
     <div class="stats" id="statsRow"></div>
@@ -521,6 +566,11 @@ function queueTemplate(){
         <button data-v="all" class="${state.tsStatus==='all'?'active':''}">Any status</button>
         <button data-v="pending" class="${state.tsStatus==='pending'?'active':''}">Pending TS</button>
         <button data-v="done" class="${state.tsStatus==='done'?'active':''}">Done</button>
+      </div>
+      <div class="seg" id="kindSeg">
+        <button data-v="all" class="${state.tsKind==='all'?'active':''}">All TS types</button>
+        <button data-v="manual" class="${state.tsKind==='manual'?'active':''}">Manual (GM)</button>
+        <button data-v="auto" class="${state.tsKind==='auto'?'active':''}">Auto</button>
       </div>
       <input class="search" id="searchBox" type="text" placeholder="Search seller, ID, or company…" value="${escapeHtml(state.q)}">
       <button class="btn-download" id="downloadQueueBtn" title="Download the currently filtered view as CSV">⬇ CSV</button>
@@ -536,7 +586,7 @@ function queueTemplate(){
   `;
 }
 
-function passesFilter(s){
+function passesFilter(s, inZg){
   if(state.gm && s.gm !== state.gm) return false;
   if(state.q){
     const q = state.q.toLowerCase();
@@ -544,6 +594,10 @@ function passesFilter(s){
   }
   const isZeroGmv = s.zeroGmv && s.zeroGmv.isZeroGmv;
   if(state.scope==="eligible" && !s.eligible && !isZeroGmv) return false;
+  if(state.tsKind!=="all"){
+    const k = inZg ? "manual" : (eligType(s) || (isZeroGmv ? "manual" : null));
+    if(k !== state.tsKind) return false;
+  }
   if(state.tsStatus==="pending" && s.tsDone) return false;
   if(state.tsStatus==="done" && !s.tsDone) return false;
   return true;
@@ -555,12 +609,17 @@ function renderQueueStats(){
   const done = eligible.filter(s=>s.tsDone);
   const doneManual = done.filter(s=>s.tsType==="manual_ts").length;
   const doneAuto = done.filter(s=>s.tsType==="auto_ts").length;
-  const rate = eligible.length ? Math.round(done.length/eligible.length*100) : 0;
+  const autoE = eligible.filter(s=>eligType(s)==="auto");
+  const manE = eligible.filter(s=>eligType(s)==="manual");
+  const autoD = autoE.filter(s=>s.tsDone).length;
+  const manD = manE.filter(s=>s.tsDone).length;
+  const pctTxt = (a,b)=>{ const p = pctOrNull(a,b); return p==null ? "—" : p+"%"; };
   const tiles = [
-    {n:eligible.length, l:"Eligible for TS", cap: state.gm || "All GMs"},
-    {n:done.length, l:"TS Done", cap: `${doneManual} manual · ${doneAuto} auto`},
-    {n:eligible.length-done.length, l:"TS Pending"},
-    {n:rate+"%", l:"Completion rate"},
+    {n:eligible.length, l:"Eligible for TS", cap:`${autoE.length} auto · ${manE.length} manual — ${state.gm || "All GMs"}`},
+    {n:pctTxt(done.length, eligible.length), l:"Overall compliance", cap:`${done.length}/${eligible.length} done · ${doneManual} manual TS · ${doneAuto} auto TS`},
+    {n:pctTxt(manD, manE.length), l:"Manual (GM) compliance", cap:`${manD}/${manE.length} done`},
+    {n:pctTxt(autoD, autoE.length), l:"Auto compliance", cap:`${autoD}/${autoE.length} done`},
+    {n:manE.length-manD, l:"GM pending", cap:`+ ${autoE.length-autoD} auto pending (not on GM)`},
   ];
   const el = document.getElementById("statsRow");
   if(el) el.innerHTML = tiles.map(t=>`<div class="stat-tile"><div class="n mono">${t.n}</div><div class="l">${t.l}</div>${t.cap?`<div class="cap">${t.cap}</div>`:""}</div>`).join("");
@@ -571,12 +630,12 @@ function renderGmSidebar(){
   if(!el) return;
   const q = (document.getElementById("gmSearch").value||"").toLowerCase();
   const list = GM_LIST.filter(g=>g.toLowerCase().includes(q));
-  const totalPending = SELLERS.filter(s=>s.eligible && !s.tsDone).length;
+  const totalPending = SELLERS.filter(s=>eligType(s)==="manual" && !s.tsDone).length;
   const overallRow = `<button class="gm-row overall-row ${!state.gm?'active':''}" data-gm="__all__">
       <span class="name">All GMs (Overall)</span><span class="badge">${totalPending||""}</span>
     </button>`;
   el.innerHTML = overallRow + list.map(g=>{
-    const pending = SELLERS.filter(s=>s.gm===g && s.eligible && !s.tsDone).length;
+    const pending = SELLERS.filter(s=>s.gm===g && eligType(s)==="manual" && !s.tsDone).length;
     return `<button class="gm-row ${state.gm===g?'active':''}" data-gm="${escapeHtml(g)}">
       <span class="name">${escapeHtml(g)}</span><span class="badge">${pending||""}</span>
     </button>`;
@@ -626,12 +685,8 @@ function rtoTrendHtml(oldV, newV){
   return `<span class="${cls} mono">${arrow} ${newV.toFixed(2)}%</span>`;
 }
 
-function rowHtml(s){
-  const statusHtml = s.tsDone
-    ? `<span class="status-pill done">Done${s.tsType==='auto_ts'?'<span class="ts-type">AUTO</span>':''}</span><div class="ts-meta">${escapeHtml(s.tsType==='manual_ts'?(s.tsBy||''):'Hitesh Agarwal')} · ${s.tsDate||''}</div>`
-    : (s.tsType==='auto_ts'
-        ? `<span class="status-pill pending">Pending</span><div class="ts-meta">Auto TS done ${s.tsDate||''} — manual still required</div>`
-        : `<span class="status-pill pending">Pending</span>`);
+function rowHtml(s, inZg){
+  const statusHtml = tsStatusHtml(s, false, inZg);
   return `<div class="row" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
     <div class="seller" data-label="Seller">${escapeHtml(s.name)}<div class="sid">${escapeHtml(s.id)}</div></div>
     <div data-label="GM">${escapeHtml(s.gm)}</div>
@@ -661,12 +716,11 @@ function queueRowHeadHtml(){
 function renderBuckets(){
   const el = document.getElementById("buckets");
   if(!el) return;
-  const filtered = SELLERS.filter(passesFilter);
   el.innerHTML = BUCKET_ORDER.map(bk=>{
     const meta = BUCKET_META[bk];
     const unsorted = meta.isZeroGmv
-      ? filtered.filter(s=>s.zeroGmv && s.zeroGmv.isZeroGmv)
-      : filtered.filter(s=>s.bucket===bk);
+      ? SELLERS.filter(s=>isZG(s) && passesFilter(s, true))
+      : SELLERS.filter(s=>s.bucket===bk && passesFilter(s, false));
     const rows = sortRows(unsorted, state.sort.field, state.sort.dir);
     const collapsed = state.collapsed[bk] ? "collapsed" : "";
     return `<div class="bucket ${collapsed}" data-bucket="${bk}">
@@ -678,7 +732,7 @@ function renderBuckets(){
         <span class="chev">▾</span>
       </div>
       <div class="bucket-body">
-        ${rows.length ? queueRowHeadHtml() + rows.map(rowHtml).join("") : `<div class="empty-bucket">No sellers in this bucket for the current filter.</div>`}
+        ${rows.length ? queueRowHeadHtml() + rows.map(s=>rowHtml(s, !!meta.isZeroGmv)).join("") : `<div class="empty-bucket">No sellers in this bucket for the current filter.</div>`}
       </div>
     </div>`;
   }).join("");
@@ -715,12 +769,7 @@ function openSellerDetail(id){
   const s = SELLERS.find(x=>x.id===id);
   if(!s) return;
   const bm = BUCKET_META[s.bucket];
-  const statusHtml = s.tsDone
-    ? `<span class="status-pill done">Done${s.tsType==='auto_ts'?'<span class="ts-type">AUTO</span>':''}</span>
-       <div class="ts-meta">by ${escapeHtml(s.tsType==='manual_ts'?(s.tsBy||''):'Hitesh Agarwal')} on ${escapeHtml(s.tsDate||'')}</div>`
-    : (s.tsType==='auto_ts'
-        ? `<span class="status-pill pending">Pending</span><div class="ts-meta">Auto TS done ${escapeHtml(s.tsDate||'')} — this bucket requires a manual TS too</div>`
-        : `<span class="status-pill pending">Pending</span>`);
+  const statusHtml = tsStatusHtml(s, true);
   detailScrim.innerHTML = `
     <div class="panel" style="max-width:640px;">
       <h2>${escapeHtml(s.name)}</h2>
@@ -743,6 +792,7 @@ function openSellerDetail(id){
         <div><label>L7D Meta spend</label><div>${spendCellHtml(s.l7dMetaSpend)}</div></div>
         <div><label>Eligible via</label><div>${s.eligibleViaW1?'<span class="status-pill done">W1</span>':''} ${s.eligibleViaL7d?'<span class="status-pill done">L7D</span>':''}${(s.zeroGmv&&s.zeroGmv.isZeroGmv)?'<span class="status-pill" style="background:var(--b-zerogmv);color:#fff;">Zero GMV</span>':''}${(!s.eligibleViaW1&&!s.eligibleViaL7d&&!(s.zeroGmv&&s.zeroGmv.isZeroGmv))?'<span class="na">not eligible</span>':''}</div></div>
         ${(s.zeroGmv&&s.zeroGmv.isZeroGmv) ? `<div><label>Zero GMV task scheduled</label><div class="mono" style="font-size:12px;">${escapeHtml((s.zeroGmv.scheduledAt||'').replace('T',' ').slice(0,16))}</div></div>` : ''}
+        <div><label>TS eligibility</label><div>${eligLabel(s)}</div></div>
         <div><label>TS status</label><div>${statusHtml}</div></div>
       </div>
       <div class="field" style="margin-top:14px;">
@@ -771,6 +821,14 @@ function wireQueueTab(){
     renderBuckets();
     renderGmSidebar();
   });
+  const kindSeg = document.getElementById("kindSeg");
+  if(kindSeg) kindSeg.addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    document.querySelectorAll("#kindSeg button").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    state.tsKind = b.dataset.v;
+    renderBuckets();
+  });
   const statusSeg = document.getElementById("statusSeg");
   if(statusSeg) statusSeg.addEventListener("click", e=>{
     const b = e.target.closest("button"); if(!b) return;
@@ -791,13 +849,14 @@ function wireQueueTab(){
   }
   const dlBtn = document.getElementById("downloadQueueBtn");
   if(dlBtn) dlBtn.onclick = ()=>{
-    const rows = SELLERS.filter(passesFilter);
+    const rows = SELLERS.filter(s=>passesFilter(s, false));
     const cols = [
       {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"company",label:"Company"},
       {key:"gm",label:"GM"}, {key:"gc",label:"GC"}, {key:"bestSource",label:"Source"},
       {key:"bucket",label:"Bucket"}, {key:"w1Spend",label:"W1 Spend"}, {key:"w1Pnl",label:"W1 PNL %"},
       {key:"w2Spend",label:"W2 Spend"}, {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"},
-      {key:"l7dMetaSpend",label:"L7D Meta Spend"}, {key:"tsDone",label:"TS Done"}, {key:"tsType",label:"TS Type"},
+      {key:"l7dMetaSpend",label:"L7D Meta Spend"}, {key:"tsEligType",label:"TS Eligibility (auto/manual)"}, {key:"autoTag",label:"Tagged Auto"},
+      {key:"tsDone",label:"TS Done"}, {key:"countedInCompliance",label:"Counted In Compliance"}, {key:"tsType",label:"TS Type"},
       {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"},
     ];
     const namePart = state.gm ? state.gm.replace(/\s+/g,"_") : "All_GMs";
@@ -820,10 +879,26 @@ function complianceTemplate(){
 }
 
 const COMPLIANCE_SORT_COLS = [
-  {key:"gm", label:"GM"}, {key:"eligible", label:"Eligible"}, {key:"done", label:"Done"},
-  {key:"doneManual", label:"Manual"}, {key:"doneAuto", label:"Auto"},
-  {key:"pending", label:"Pending"}, {key:"rate", label:"Compliance"},
+  {key:"gm", label:"GM"},
+  {key:"eligible", label:"Eligible"}, {key:"done", label:"Done"}, {key:"rate", label:"Compliance"},
+  {key:"autoEligible", label:"Eligible"}, {key:"autoDone", label:"Done"}, {key:"autoRate", label:"Compliance"},
+  {key:"manualEligible", label:"Eligible"}, {key:"manualDone", label:"Done"}, {key:"manualRate", label:"Compliance"},
+  {key:"gmPending", label:"GM Pending"},
 ];
+function complianceRowFromGm(g){
+  const split = g.autoEligible != null;
+  return {...g, doneManual: g.doneManual||0, doneAuto: g.doneAuto||0, pending: g.eligible-g.done, rate: g.eligible ? Math.round(g.done/g.eligible*100) : 0,
+    autoEligible: split ? g.autoEligible : null, autoDone: split ? g.autoDone : null, autoRate: split ? pctOrNull(g.autoDone, g.autoEligible) : null,
+    manualEligible: split ? g.manualEligible : null, manualDone: split ? g.manualDone : null, manualRate: split ? pctOrNull(g.manualDone, g.manualEligible) : null,
+    gmPending: split ? g.manualEligible - g.manualDone : null};
+}
+function complianceRowHtml(g, cls){
+  return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(g.gm)}</td>
+    <td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td>${rateCell(g.rate)}</td>
+    <td>${numCell(g.autoEligible)}</td><td>${numCell(g.autoDone)}</td><td>${rateCell(g.autoRate)}</td>
+    <td>${numCell(g.manualEligible)}</td><td>${numCell(g.manualDone)}</td><td>${rateCell(g.manualRate)}</td>
+    <td>${numCell(g.gmPending)}</td></tr>`;
+}
 const BREAKDOWN_BUCKETS = ["objective_hit","potential","breakeven_potential","bucket_health","rest_ts_pending"];
 
 function renderCompliance(){
@@ -831,11 +906,17 @@ function renderCompliance(){
   if(!body) return;
   const doc = COMPLIANCE_WEEKS[state.complianceWeek];
   if(!doc){ body.innerHTML = `<div class="empty-state">No compliance data recorded yet.</div>`; return; }
-  let rows = Object.values(doc.byGM||{}).map(g=>({...g, doneManual: g.doneManual||0, doneAuto: g.doneAuto||0, pending: g.eligible-g.done, rate: g.eligible? Math.round(g.done/g.eligible*100):0}));
+  let rows = Object.values(doc.byGM||{}).map(complianceRowFromGm);
   rows = sortRows(rows, state.complianceSort.field, state.complianceSort.dir);
   const overallRate = doc.totalEligible ? Math.round(doc.totalDone/doc.totalEligible*100) : 0;
   const totalDoneManual = doc.totalDoneManual!=null ? doc.totalDoneManual : rows.reduce((a,g)=>a+g.doneManual,0);
   const totalDoneAuto = doc.totalDoneAuto!=null ? doc.totalDoneAuto : rows.reduce((a,g)=>a+g.doneAuto,0);
+  const hasSplit = rows.length > 0 && rows.every(g=>g.autoEligible!=null);
+  const sumOr = (docKey, rowKey)=> doc[docKey]!=null ? doc[docKey] : (hasSplit ? rows.reduce((a,g)=>a+g[rowKey],0) : null);
+  const totalRow = complianceRowFromGm({gm:"All GMs (Overall)", eligible: doc.totalEligible, done: doc.totalDone,
+    autoEligible: sumOr("totalAutoEligible","autoEligible"), autoDone: sumOr("totalAutoDone","autoDone"),
+    manualEligible: sumOr("totalManualEligible","manualEligible"), manualDone: sumOr("totalManualDone","manualDone")});
+  const tileRate = r=> r==null ? "—" : r+"%";
 
   // live bucket breakdown by GM (from current SELLERS, not the frozen weekly doc)
   const breakdownRows = GM_LIST.map(g=>{
@@ -849,20 +930,25 @@ function renderCompliance(){
 
   body.innerHTML = `
     <div class="stats">
-      <div class="stat-tile"><div class="n mono">${doc.totalEligible}</div><div class="l">Total Eligible</div><div class="cap">${escapeHtml(doc.dateRange||'')}</div></div>
-      <div class="stat-tile"><div class="n mono">${doc.totalDone}</div><div class="l">Total TS Done</div><div class="cap">${totalDoneManual} manual · ${totalDoneAuto} auto</div></div>
-      <div class="stat-tile"><div class="n mono">${doc.totalEligible-doc.totalDone}</div><div class="l">Total Pending</div></div>
-      <div class="stat-tile"><div class="n mono">${overallRate}%</div><div class="l">Overall Compliance</div></div>
+      <div class="stat-tile"><div class="n mono">${doc.totalEligible}</div><div class="l">Total Eligible</div><div class="cap">${hasSplit ? `${totalRow.autoEligible} auto · ${totalRow.manualEligible} manual` : escapeHtml(doc.dateRange||'')}</div></div>
+      <div class="stat-tile"><div class="n mono">${overallRate}%</div><div class="l">Overall Compliance</div><div class="cap">${doc.totalDone}/${doc.totalEligible} done · ${totalDoneManual} manual TS · ${totalDoneAuto} auto TS</div></div>
+      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.manualRate)}</div><div class="l">Manual (GM) Compliance</div><div class="cap">${hasSplit ? `${totalRow.manualDone}/${totalRow.manualEligible} done` : 'not tracked this week'}</div></div>
+      <div class="stat-tile"><div class="n mono">${tileRate(totalRow.autoRate)}</div><div class="l">Auto Compliance</div><div class="cap">${hasSplit ? `${totalRow.autoDone}/${totalRow.autoEligible} done` : 'not tracked this week'}</div></div>
+      <div class="stat-tile"><div class="n mono">${hasSplit ? totalRow.gmPending : doc.totalEligible-doc.totalDone}</div><div class="l">${hasSplit ? 'GM Pending' : 'Total Pending'}</div><div class="cap">${hasSplit ? `+ ${totalRow.autoEligible-totalRow.autoDone} auto pending (not on GM)` : ''}</div></div>
     </div>
     <div class="card">
       <h2 class="card-head-row">Compliance by GM — ${escapeHtml(doc.weekLabel)} <button class="btn-download-sm" data-download="compliance-leaderboard" title="Download as CSV">⬇ CSV</button></h2>
-      <table class="simple">
-        <thead><tr>${COMPLIANCE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable">${c.label}${sortArrow(c.key, state.complianceSort)}</th>`).join("")}</tr></thead>
+      <div class="table-scroll"><table class="simple">
+        <thead>
+          <tr><th class="grp"></th><th class="grp" colspan="3">Total eligible</th><th class="grp" colspan="3">Auto-eligible</th><th class="grp" colspan="3">Manual-eligible (GM)</th><th class="grp"></th></tr>
+          <tr>${COMPLIANCE_SORT_COLS.map(c=>`<th data-sort="${c.key}" class="sortable">${c.label}${sortArrow(c.key, state.complianceSort)}</th>`).join("")}</tr>
+        </thead>
         <tbody>
-          <tr class="total-row"><td>All GMs (Overall)</td><td class="mono">${doc.totalEligible}</td><td class="mono">${doc.totalDone}</td><td class="mono">${totalDoneManual}</td><td class="mono">${totalDoneAuto}</td><td class="mono">${doc.totalEligible-doc.totalDone}</td><td><span class="rate-bar"><div style="width:${overallRate}%"></div></span>${overallRate}%</td></tr>
-          ${rows.map(g=>`<tr><td>${escapeHtml(g.gm)}</td><td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td class="mono">${g.doneManual}</td><td class="mono">${g.doneAuto}</td><td class="mono">${g.pending}</td><td><span class="rate-bar"><div style="width:${g.rate}%"></div></span>${g.rate}%</td></tr>`).join("")}
+          ${complianceRowHtml(totalRow, "total-row")}
+          ${rows.map(g=>complianceRowHtml(g)).join("")}
         </tbody>
-      </table>
+      </table></div>
+      ${hasSplit ? '' : '<div class="ts-meta" style="margin-top:6px;">Auto/manual split wasn\'t tracked for this week yet — only totals are available.</div>'}
     </div>
     <div class="card">
       <h2 class="card-head-row">Bucket totals by GM <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— click a count to see which sellers</span> <button class="btn-download-sm" data-download="bucket-breakdown" title="Download as CSV">⬇ CSV</button></h2>
