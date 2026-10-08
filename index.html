@@ -249,6 +249,10 @@
   table.movement{ font-size:11px; }
   table.movement th, table.movement td{ padding:5px 8px; }
   .owner-bar{ justify-content:space-between; }
+  .self-log{ display:inline-flex; align-items:center; gap:4px; margin-top:4px; font-size:10px; font-weight:600; color:var(--text-muted); cursor:pointer; user-select:none; white-space:nowrap; }
+  .self-log input{ margin:0; accent-color:var(--up-fg); cursor:pointer; }
+  .row.self-logged{ background:color-mix(in srgb, var(--done-bg) 55%, transparent); }
+  .row.self-logged .self-log{ color:var(--done-fg); }
   details.caveat summary{ cursor:pointer; color:var(--text); list-style:none; user-select:none; }
   details.caveat summary::-webkit-details-marker{ display:none; }
   details.caveat summary::before{ content:"▸"; display:inline-block; margin-right:6px; color:var(--accent); transition:transform .15s; }
@@ -432,6 +436,22 @@ function eligType(s){
   return s.autoTag ? "auto" : "manual";
 }
 function isZG(s){ return !!(s.zeroGmv && s.zeroGmv.isZeroGmv); }
+// "TS logged" ticks are each GM's own same-day notes: stored only in this browser, never sent anywhere,
+// never counted in compliance. The official status still comes from the TS log on the next refresh.
+const SELF_LOG_KEY = "ts_selflog_v1";
+function selfLogWeek(){ const d = new Date(); return isoWeekKeyOf(new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))); }
+function loadSelfLog(){
+  try{ const all = JSON.parse(localStorage.getItem(SELF_LOG_KEY) || "{}"); return all[selfLogWeek()] || {}; }catch(e){ return {}; }
+}
+function saveSelfLog(map){
+  try{ localStorage.setItem(SELF_LOG_KEY, JSON.stringify({[selfLogWeek()]: map})); }catch(e){}
+}
+let SELF_LOG = loadSelfLog();
+function isGmPending(s, inZg){ return !s.tsDone && (inZg || eligType(s) === "manual"); }
+function selfLogHtml(s, inZg){
+  if(!isGmPending(s, inZg)) return "";
+  return `<label class="self-log" title="Your own note for today, saved only on this device. The official status updates on the next refresh."><input type="checkbox" data-selflog="${escapeHtml(s.id)}" ${SELF_LOG[s.id] ? "checked" : ""}> TS logged</label>`;
+}
 function pctOrNull(a, b){ return b ? Math.round(a/b*100) : null; }
 function numCell(v){ return v==null ? '<span class="na">—</span>' : `<span class="mono">${v}</span>`; }
 function rateCls(r){ return r >= 80 ? "hi" : r >= 50 ? "mid" : "lo"; }
@@ -508,6 +528,17 @@ function renderShell(){
 // the click. Delegating to #appRoot (which itself is never replaced, only its
 // contents) makes every one of these interactive regardless of render timing.
 document.getElementById("appRoot").addEventListener("click", e=>{
+  const selfLogEl = e.target.closest(".self-log");
+  if(selfLogEl){
+    const box = selfLogEl.querySelector("input[data-selflog]");
+    if(e.target !== box) return;  // a click on the label text is forwarded to the checkbox; handle it once
+    const id = box.dataset.selflog;
+    if(box.checked) SELF_LOG[id] = Date.now(); else delete SELF_LOG[id];
+    saveSelfLog(SELF_LOG);
+    document.querySelectorAll(".row[data-id]").forEach(r=>{ if(r.dataset.id === id) r.classList.toggle("self-logged", box.checked); });
+    renderQueueStats();
+    return;
+  }
   const rowEl = e.target.closest(".row[data-id]");
   if(rowEl){ openSellerDetail(rowEl.dataset.id); return; }
 
@@ -605,6 +636,7 @@ document.getElementById("appRoot").addEventListener("click", e=>{
 });
 document.getElementById("appRoot").addEventListener("keydown", e=>{
   if(e.key!=="Enter" && e.key!==" ") return;
+  if(e.target.closest(".self-log")) return;
   const rowEl = e.target.closest(".row[data-id]");
   if(rowEl){ e.preventDefault(); openSellerDetail(rowEl.dataset.id); }
 });
@@ -641,7 +673,7 @@ function queueTemplate(){
       <div class="caveat-body">PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
       RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log. For Objective Hit, Potential, Breakeven Potential, and Bucket Health specifically, an auto-TS alone does NOT count as done — a manual TS is required from the GM; such accounts show as Pending with a note even if Hitesh Agarwal's auto-TS already ran.
       <b>Auto vs manual:</b> eligible sellers tagged <i>auto</i> in the auto-TS program (Metabase 9963) are <b>auto-eligible</b> (marked AUTO-ELIGIBLE) and are not counted as GM pending — except in the four buckets above, which stay manual. A TS logged on a seller who isn't TS-eligible is never counted in compliance. <b>Auto compliance</b> = auto-eligible sellers with an auto TS ÷ auto-eligible. <b>Manual TS compliance</b> = manual-eligible sellers done ÷ manual-eligible. <b>Total compliance of GM</b> = (manual-eligible done + auto-eligible sellers the GM also troubleshot) ÷ manual-eligible.
-      <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Only tasks <b>scheduled on this week's Monday</b> are included — tasks created later in the week are not part of it. Zero GMV sellers always need a <b>manual TS from the GM</b> (an auto TS alone doesn't count), and they're counted in the main totals as manual-eligible. Each Zero GMV seller is listed only in the Zero GMV section (not again in its PNL bucket), so the sections add up to the GM's pending count.
+      <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Only tasks <b>scheduled on this week's Monday</b> are included — tasks created later in the week are not part of it. Zero GMV sellers always need a <b>manual TS from the GM</b> (an auto TS alone doesn't count), and they're counted in the main totals as manual-eligible. Each Zero GMV seller is listed only in the Zero GMV section (not again in its PNL bucket), so the sections add up to the GM's pending count. <b>"TS logged" tick:</b> GMs can tick a pending seller once they've done the TS, as a note to themselves for the day. It's saved only on that device, doesn't change any count, and clears when the next refresh shows the TS in the log.
       </div>
     </details>
     <div class="stats" id="statsRow"></div>
@@ -709,7 +741,7 @@ function renderQueueStats(){
     {n:pctTxt(manD, manE.length), l:"Manual TS compliance", cap:`${manD}/${manE.length} manual-eligible done`},
     {n:pctTxt(manD+manOnAuto, manE.length), l:"Total compliance of GM", cap:`(${manD} + ${manOnAuto} on auto-eligible) / ${manE.length}`},
     {n:pctTxt(autoD, autoE.length), l:"Auto TS compliance", cap:`${autoD}/${autoE.length} auto TS done`},
-    {n:manE.length-manD, l:"GM pending", cap:`+ ${autoE.length-autoD} awaiting auto TS (not on GM)`},
+    {n:manE.length-manD, l:"GM pending", cap:`+ ${autoE.length-autoD} awaiting auto TS (not on GM)${(()=>{ const m = scoped.filter(s=>s.eligible && isGmPending(s, false) && SELF_LOG[s.id]).length; return m ? ` · ${m} ticked "TS logged" by you` : ""; })()}`},
   ];
   const el = document.getElementById("statsRow");
   if(el) el.innerHTML = tiles.map(t=>`<div class="stat-tile"><div class="n mono">${t.n}</div><div class="l">${t.l}</div>${t.cap?`<div class="cap">${t.cap}</div>`:""}</div>`).join("");
@@ -777,7 +809,8 @@ function rtoTrendHtml(oldV, newV){
 
 function rowHtml(s, inZg){
   const statusHtml = tsStatusHtml(s, false, inZg);
-  return `<div class="row" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
+  const marked = isGmPending(s, inZg) && SELF_LOG[s.id];
+  return `<div class="row${marked ? ' self-logged' : ''}" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
     <div class="seller" data-label="Seller">${escapeHtml(s.name)}<div class="sid">${escapeHtml(s.id)}</div></div>
     <div data-label="GM">${escapeHtml(s.gm)}</div>
     <div data-label="GC">${escapeHtml(s.gc||'—')}</div>
@@ -788,7 +821,7 @@ function rowHtml(s, inZg){
     <div data-label="W2 PNL">${pnlCellHtml(s.w2Pnl, s.w2Spend, s.w3Pnl)}</div>
     <div data-label="RTO (W1)">${rtoTrendHtml(s.rtoW2, s.rtoW1)}${s.rtoSource==='facebook_proxy'?'<sup class="rto-src" title="RTO taken from Facebook data as a proxy — this seller\'s best source is new_pnl, which doesn\'t expose RTO in bulk yet">FB</sup>':''}</div>
     <div data-label="L7D Meta">${spendCellHtml(s.l7dMetaSpend)}</div>
-    <div data-label="TS Status">${statusHtml}</div>
+    <div data-label="TS Status">${statusHtml}${selfLogHtml(s, inZg)}</div>
   </div>`;
 }
 
