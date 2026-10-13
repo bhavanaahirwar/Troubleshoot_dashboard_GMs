@@ -116,7 +116,7 @@
   .bucket.collapsed .chev{ transform:rotate(-90deg); }
   .bucket.collapsed .bucket-body{ display:none; }
 
-  .row-head, .row{ display:grid; grid-template-columns: 1.5fr .9fr .8fr .8fr .8fr .9fr .8fr .9fr .9fr .9fr 1fr; gap:6px; padding:9px 16px; align-items:center; font-size:12px; }
+  .row-head, .row{ display:grid; grid-template-columns: 1.5fr .9fr .8fr .8fr .8fr .9fr .8fr .9fr .9fr .9fr .8fr 1fr; gap:6px; padding:9px 16px; align-items:center; font-size:12px; }
   .row-head{ background:var(--surface-2); color:var(--text-faint); font-size:10px; text-transform:uppercase; letter-spacing:.02em; font-weight:600; }
   .row-head .sortable, th.sortable{ cursor:pointer; user-select:none; }
   .row-head .sortable:hover, th.sortable:hover{ color:var(--accent); }
@@ -144,6 +144,10 @@
   table.simple th.grp{ text-align:center; border-bottom:none; padding-bottom:0; color:var(--text-muted); }
   .ts-type{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:999px; background:var(--auto-bg); color:var(--auto-fg); margin-left:4px; }
   .ts-meta{ font-size:9.5px; color:var(--text-faint); margin-top:2px; }
+  .last-ts-date{ white-space:nowrap; }
+  .last-ts-type{ font-size:9px; font-weight:700; padding:1px 5px; border-radius:999px; margin-left:4px; white-space:nowrap; }
+  .last-ts-type.m{ background:var(--done-bg); color:var(--done-fg); }
+  .last-ts-type.a{ background:var(--auto-bg); color:var(--auto-fg); }
   .empty-bucket, .empty-state{ padding:24px; text-align:center; color:var(--text-faint); font-size:12.5px; }
 
   .card{ background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:16px; margin-bottom:14px; }
@@ -464,6 +468,17 @@ function eligLabel(s){
   if(et==="manual") return s.autoTag ? "Manual (GM) — tagged auto, but this bucket needs a manual TS" : "Manual (GM)";
   return '<span class="na">not eligible — not counted in compliance</span>';
 }
+// Most recent TS logged for the seller in any week (not just this one) — date + manual/auto.
+function lastTsHtml(s, detail){
+  if(!s.lastTsDate) return '<span class="na">No TS yet</span>';
+  const d = new Date(s.lastTsDate + "T00:00:00");
+  const opts = {day:"numeric", month:"short"};
+  if(d.getFullYear() !== new Date().getFullYear()) opts.year = "numeric";
+  const manual = s.lastTsType === "manual_ts";
+  const tag = `<span class="last-ts-type ${manual ? 'm' : 'a'}">${manual ? 'MANUAL' : 'AUTO'}</span>`;
+  const by = manual && s.lastTsBy ? `<div class="ts-meta">${detail ? 'by ' : ''}${escapeHtml(s.lastTsBy)}</div>` : '';
+  return `<span class="mono last-ts-date" title="${escapeHtml(s.lastTsDate)}">${escapeHtml(d.toLocaleDateString(undefined, opts))}</span>${tag}${by}`;
+}
 function tsStatusHtml(s, detail, inZg){
   const et = inZg ? "manual" : eligType(s);
   const tag = et==="auto" ? '<span class="elig-tag" title="Tagged auto in the auto-TS program">AUTO-ELIGIBLE</span>' : "";
@@ -496,6 +511,10 @@ function flattenSnapshot(gmDocs){
     s.tsEligType = eligType(s); s.autoTag = !!s.autoTag; s.countedInCompliance = !!(s.eligible && s.tsDone);
     if(s.hasManualTs === undefined) s.hasManualTs = s.tsType === "manual_ts";
     if(s.hasAutoTs === undefined) s.hasAutoTs = s.tsType === "auto_ts";
+    const lt = Array.isArray(s.lastTs) ? s.lastTs : null;
+    s.lastTsDate = lt ? lt[0] : null;
+    s.lastTsType = lt ? (lt[1] === "m" ? "manual_ts" : "auto_ts") : null;
+    s.lastTsBy = lt ? (lt[1] === "m" ? (lt[2] || "") : "Auto TS") : null;
   });
   SELLERS = sellers;
   GM_LIST = [...gms].sort((a,b)=>a.localeCompare(b));
@@ -567,7 +586,7 @@ document.getElementById("appRoot").addEventListener("click", e=>{
       {key:"w1Spend",label:"W1 Spend"}, {key:"w1Pnl",label:"W1 PNL %"}, {key:"w2Spend",label:"W2 Spend"},
       {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"}, {key:"l7dMetaSpend",label:"L7D Meta Spend"},
       {key:"tsEligType",label:"TS Eligibility (auto/manual)"}, {key:"autoTag",label:"Tagged Auto"},
-      {key:"tsDone",label:"TS Done"}, {key:"countedInCompliance",label:"Counted In Compliance"}, {key:"tsType",label:"TS Type"}, {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"},
+      {key:"tsDone",label:"TS Done"}, {key:"countedInCompliance",label:"Counted In Compliance"}, {key:"tsType",label:"TS Type"}, {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"}, {key:"lastTsDate",label:"Last TS Date (any week)"}, {key:"lastTsType",label:"Last TS Type"}, {key:"lastTsBy",label:"Last TS By"},
     ];
     const namePart = state.gm ? state.gm.replace(/\s+/g,"_") : "All_GMs";
     downloadCsv(`${bk}_${namePart}.csv`, rows, cols);
@@ -823,6 +842,7 @@ function rowHtml(s, inZg){
     <div data-label="W2 PNL">${pnlCellHtml(s.w2Pnl, s.w2Spend, s.w3Pnl)}</div>
     <div data-label="RTO (W1)">${rtoTrendHtml(s.rtoW2, s.rtoW1)}${s.rtoSource==='facebook_proxy'?'<sup class="rto-src" title="RTO taken from Facebook data as a proxy — this seller\'s best source is new_pnl, which doesn\'t expose RTO in bulk yet">FB</sup>':''}</div>
     <div data-label="L7D Meta">${spendCellHtml(s.l7dMetaSpend)}</div>
+    <div data-label="Last TS">${lastTsHtml(s)}</div>
     <div data-label="TS Status">${statusHtml}${selfLogHtml(s, inZg)}</div>
   </div>`;
 }
@@ -830,7 +850,7 @@ function rowHtml(s, inZg){
 const QUEUE_SORT_COLS = [
   {key:"name", label:"Seller"}, {key:"gm", label:"GM"}, {key:"gc", label:"GC"}, {key:"bestSource", label:"Source"},
   {key:"w1Spend", label:"W1 Spend"}, {key:"w1Pnl", label:"W1 PNL"}, {key:"w2Spend", label:"W2 Spend"}, {key:"w2Pnl", label:"W2 PNL"},
-  {key:"rtoW1", label:"RTO (W1)"}, {key:"l7dMetaSpend", label:"L7D Meta"}, {key:"tsDone", label:"TS Status"},
+  {key:"rtoW1", label:"RTO (W1)"}, {key:"l7dMetaSpend", label:"L7D Meta"}, {key:"lastTsDate", label:"Last TS"}, {key:"tsDone", label:"TS Status"},
 ];
 function queueRowHeadHtml(){
   return `<div class="row-head">${QUEUE_SORT_COLS.map(c=>
@@ -918,6 +938,7 @@ function openSellerDetail(id){
         <div><label>Eligible via</label><div>${s.eligibleViaW1?'<span class="status-pill done">W1</span>':''} ${s.eligibleViaL7d?'<span class="status-pill done">L7D</span>':''}${(s.zeroGmv&&s.zeroGmv.isZeroGmv)?'<span class="status-pill" style="background:var(--b-zerogmv);color:#fff;">Zero GMV</span>':''}${(!s.eligibleViaW1&&!s.eligibleViaL7d&&!(s.zeroGmv&&s.zeroGmv.isZeroGmv))?'<span class="na">not eligible</span>':''}</div></div>
         ${(s.zeroGmv&&s.zeroGmv.isZeroGmv) ? `<div><label>Zero GMV task scheduled</label><div class="mono" style="font-size:12px;">${escapeHtml((s.zeroGmv.scheduledAt||'').replace('T',' ').slice(0,16))}</div></div>` : ''}
         <div><label>TS eligibility</label><div>${eligLabel(s)}</div></div>
+        <div><label>Last TS (any week)</label><div>${lastTsHtml(s, true)}</div></div>
         <div><label>TS status</label><div>${statusHtml}</div></div>
       </div>
       <div class="field" style="margin-top:14px;">
@@ -982,7 +1003,7 @@ function wireQueueTab(){
       {key:"w2Spend",label:"W2 Spend"}, {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"},
       {key:"l7dMetaSpend",label:"L7D Meta Spend"}, {key:"tsEligType",label:"TS Eligibility (auto/manual)"}, {key:"autoTag",label:"Tagged Auto"},
       {key:"tsDone",label:"TS Done"}, {key:"countedInCompliance",label:"Counted In Compliance"}, {key:"tsType",label:"TS Type"},
-      {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"},
+      {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"}, {key:"lastTsDate",label:"Last TS Date (any week)"}, {key:"lastTsType",label:"Last TS Type"}, {key:"lastTsBy",label:"Last TS By"},
     ];
     const namePart = state.gm ? state.gm.replace(/\s+/g,"_") : "All_GMs";
     downloadCsv(`ts_priority_queue_${namePart}_${state.tsStatus}.csv`, rows, cols);
