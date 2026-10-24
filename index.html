@@ -247,6 +247,20 @@
   .rate-bar > div.mid{ background:#f59e0b; }
   .rate-bar > div.lo{ background:var(--down-fg); }
   .rate-txt{ font-weight:700; }
+  table.bk-table td, table.bk-table th{ text-align:center; padding:7px 8px; }
+  table.bk-table td:first-child, table.bk-table th:first-child{ text-align:left; }
+  table.bk-table td.bk-done{ color:var(--done-fg); }
+  table.bk-table td.bk-pend{ color:var(--down-fg); font-weight:600; }
+  table.bk-table td.bk-zero{ color:var(--text-faint); }
+  .trend-controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:4px 0 10px; }
+  .trend-legend{ display:flex; gap:14px; font-size:11.5px; color:var(--text-muted); margin:2px 0 6px; }
+  .trend-legend i{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
+  .trend-chart{ width:100%; max-width:760px; height:auto; display:block; }
+  table.trend-table td, table.trend-table th{ white-space:nowrap; }
+  table.trend-table .tsub{ display:block; font-size:10.5px; color:var(--text-faint); font-weight:400; }
+  table.trend-table td.gm-pick{ cursor:pointer; }
+  table.trend-table td.gm-pick:hover{ color:var(--accent); }
+  table.trend-table tr.picked td{ background:var(--accent-soft); }
   .rate-txt.hi{ color:var(--up-fg); } .rate-txt.mid{ color:var(--pending-fg); } .rate-txt.lo{ color:var(--down-fg); }
   .pend-num{ display:inline-block; min-width:26px; text-align:center; padding:1px 7px; border-radius:999px; background:var(--pending-bg); color:var(--pending-fg); font-weight:700; }
   .pend-num.zero{ background:var(--done-bg); color:var(--done-fg); }
@@ -408,6 +422,7 @@ let state = {
   collapsed: {},
   sort: { field: "w1Pnl", dir: "asc" },
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
+  bucketSort: { field: "gm", dir: "asc" }, trendGm: "__all__", trendMode: "total", trendSort: { field: "gm", dir: "asc" },
   moveWeek: null, moveGm: null, moveQ: "", moveRto: "all", moveSort: { field: "name", dir: "asc" },
 };
 
@@ -562,6 +577,13 @@ document.getElementById("appRoot").addEventListener("click", e=>{
   const rowEl = e.target.closest(".row[data-id]");
   if(rowEl){ openSellerDetail(rowEl.dataset.id); return; }
 
+  const bsortEl = e.target.closest("[data-bsort]");
+  if(bsortEl){ toggleSort(state.bucketSort, bsortEl.dataset.bsort); renderCompliance(); return; }
+  const tsortEl = e.target.closest("[data-tsort]");
+  if(tsortEl){ toggleSort(state.trendSort, tsortEl.dataset.tsort); renderCompliance(); return; }
+  const trendGmEl = e.target.closest("[data-trend-gm]");
+  if(trendGmEl){ state.trendGm = trendGmEl.dataset.trendGm; renderCompliance(); return; }
+
   const sortEl = e.target.closest("[data-sort]");
   if(sortEl){
     const field = sortEl.dataset.sort;
@@ -611,7 +633,7 @@ document.getElementById("appRoot").addEventListener("click", e=>{
 
   const bucketCellEl = e.target.closest("[data-bucket-cell]");
   if(bucketCellEl){
-    openBucketList(bucketCellEl.dataset.gmName, bucketCellEl.dataset.bucketCell);
+    openBucketList(bucketCellEl.dataset.gmName, bucketCellEl.dataset.bucketCell, bucketCellEl.dataset.status||"");
     return;
   }
 
@@ -632,9 +654,9 @@ document.getElementById("appRoot").addEventListener("click", e=>{
         {key:"gm",label:"GM"},{key:"eligible",label:"Eligible"},{key:"done",label:"Done"},{key:"doneManual",label:"Manual"},{key:"doneAuto",label:"Auto"},{key:"pending",label:"Pending"},{key:"rate",label:"Compliance %"},
       ]);
     } else if(kind === "bucket-breakdown"){
-      const rows = (window._breakdownRowsForExport||[]).map(r=>({gm:r.gm, ...Object.fromEntries(BREAKDOWN_BUCKETS.map(bk=>[bk, r.counts[bk]||0]))}));
+      const rows = [{gm:"All GMs (Overall)", ...(window._breakdownTotalsForExport||{})}, ...(window._breakdownRowsForExport||[])];
       downloadCsv(`bucket_totals_by_gm.csv`, rows, [
-        {key:"gm",label:"GM"}, ...BREAKDOWN_BUCKETS.map(bk=>({key:bk, label:BUCKET_META[bk].label})),
+        {key:"gm",label:"GM"}, ...BREAKDOWN_GROUPS.flatMap(bk=>BK_PARTS.map(([k,l])=>({key:`${bk}_${k}`, label:`${breakdownLabel(bk)} - ${l}`}))),
       ]);
     } else if(kind === "movement"){
       const rows = window._movementRowsForExport || [];
@@ -1053,6 +1075,115 @@ function complianceRowHtml(g, cls){
     <td class="grp-sep">${numCell(g.autoEligible)}</td><td>${numCell(g.autoDone)}</td><td>${rateCell(g.autoRate)}</td></tr>`;
 }
 const BREAKDOWN_BUCKETS = ["objective_hit","potential","breakeven_potential","bucket_health","rest_ts_pending"];
+const BREAKDOWN_GROUPS = [...BREAKDOWN_BUCKETS, "all"];
+const BK_PARTS = [["t","Total"],["d","Done"],["p","Pending"]];
+function breakdownLabel(bk){ return bk==="all" ? "All buckets" : BUCKET_META[bk].label; }
+function toggleSort(st, field){
+  if(st.field === field) st.dir = st.dir === "asc" ? "desc" : "asc";
+  else { st.field = field; st.dir = field === "gm" ? "asc" : "desc"; }
+}
+// per bucket: <bk>_t total, <bk>_d TS done, <bk>_p pending (flat keys so every column can be sorted)
+function breakdownCounts(list){
+  const c = {};
+  BREAKDOWN_GROUPS.forEach(bk=>{
+    const ss = list.filter(s=> bk==="all" ? BREAKDOWN_BUCKETS.includes(s.bucket) : s.bucket===bk);
+    const d = ss.filter(s=>s.tsDone).length;
+    c[bk+"_t"] = ss.length; c[bk+"_d"] = d; c[bk+"_p"] = ss.length - d;
+  });
+  return c;
+}
+function breakdownRowHtml(r, gmName, cls){
+  return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(r.gm)}</td>${BREAKDOWN_GROUPS.map(bk=>BK_PARTS.map(([k],i)=>{
+    const v = r[`${bk}_${k}`] || 0;
+    const tone = !v ? "bk-zero" : k==="d" ? "bk-done" : k==="p" ? "bk-pend" : "";
+    return `<td class="mono ${tone}${i===0?' grp-sep':''}" data-bucket-cell="${bk}" data-gm-name="${escapeHtml(gmName)}" data-status="${k==='d'?'done':k==='p'?'pending':''}" style="cursor:${v?'pointer':'default'};">${v}</td>`;
+  }).join("")).join("")}</tr>`;
+}
+
+// ---- week-wise compliance trend (frozen weekly docs; the current week is still in progress)
+function trendWeekKeys(){ return Object.keys(COMPLIANCE_WEEKS).sort().slice(-5); }
+function weekTotalsAsGm(doc){
+  const gs = Object.values(doc.byGM||{});
+  const split = gs.length > 0 && gs.every(g=>g.manualEligible!=null);
+  const sum = k=> gs.reduce((a,g)=>a+(g[k]||0),0);
+  return {gm:"All GMs", eligible: doc.totalEligible, done: doc.totalDone,
+    manualEligible: split ? sum("manualEligible") : null, manualDone: split ? sum("manualDone") : null,
+    manualOnAuto: split ? sum("manualOnAuto") : null, manualOnNotEligible: split ? sum("manualOnNotEligible") : null};
+}
+// total: done vs eligible · gm: TS done by GM (manual + on auto + on not eligible) vs manual eligible, pending = manual eligible - manual done
+function trendPoint(g, mode){
+  if(!g) return null;
+  if(mode === "gm"){
+    if(g.manualEligible == null) return null;
+    const done = g.manualDone + (g.manualOnAuto||0) + (g.manualOnNotEligible||0);
+    return {elig: g.manualEligible, done, pending: g.manualEligible - g.manualDone, rate: pctOrNull(done, g.manualEligible)};
+  }
+  return {elig: g.eligible, done: g.done, pending: g.eligible - g.done, rate: pctOrNull(g.done, g.eligible)};
+}
+function weekShort(wk){ return "W" + wk.split("-W")[1]; }
+function trendChartSvg(pts, weeks){
+  const W = 640, H = 250, top = 34, bottom = 46, left = 12, plotH = H - top - bottom;
+  const max = Math.max(1, ...pts.map(p=> p ? p.done + p.pending : 0));
+  const slot = (W - left*2) / weeks.length, bw = Math.min(70, slot*0.55);
+  const cur = trendWeekKeys().slice(-1)[0];
+  const bars = weeks.map((wk,i)=>{
+    const p = pts[i], cx = left + slot*i + slot/2, x = cx - bw/2;
+    const doc = COMPLIANCE_WEEKS[wk];
+    const lab = `<text x="${cx}" y="${H-26}" text-anchor="middle" style="fill:var(--text);font-size:12px;font-weight:600;">${weekShort(wk)}</text>
+      <text x="${cx}" y="${H-11}" text-anchor="middle" style="fill:var(--text-faint);font-size:10px;">${escapeHtml(wk===cur ? 'in progress' : (doc.dateRange||'').replace(/, \d{4}$/,''))}</text>`;
+    if(!p) return lab + `<text x="${cx}" y="${top+plotH-6}" text-anchor="middle" style="fill:var(--text-faint);font-size:11px;">not tracked</text>`;
+    const hd = p.done/max*plotH, hp = p.pending/max*plotH, yd = top + plotH - hd, yp = yd - hp;
+    const inner = (h, y, v, fill)=> h >= 15 ? `<text x="${cx}" y="${y + h/2 + 4}" text-anchor="middle" style="fill:${fill};font-size:11px;font-weight:600;">${v}</text>` : "";
+    return `<rect x="${x}" y="${yd}" width="${bw}" height="${hd}" rx="3" style="fill:var(--accent);"><title>${weekShort(wk)}: ${p.done} done</title></rect>
+      <rect x="${x}" y="${yp}" width="${bw}" height="${hp}" rx="3" style="fill:var(--b-pending);opacity:.78;"><title>${weekShort(wk)}: ${p.pending} pending</title></rect>
+      ${inner(hd, yd, p.done, "var(--accent-contrast)")}${inner(hp, yp, p.pending, "#fff")}
+      <text x="${cx}" y="${yp-8}" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700;">${p.rate ?? 0}%</text>${lab}`;
+  }).join("");
+  return `<svg class="trend-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly done vs pending">
+    <line x1="${left}" x2="${W-left}" y1="${top+plotH}" y2="${top+plotH}" style="stroke:var(--border);"/>${bars}</svg>`;
+}
+function renderTrendCard(){
+  const weeks = trendWeekKeys();
+  if(weeks.length < 2) return "";
+  const mode = state.trendMode;
+  const names = {};
+  weeks.forEach(wk=> Object.entries(COMPLIANCE_WEEKS[wk].byGM||{}).forEach(([k,g])=> names[k] = g.gm));
+  if(state.trendGm !== "__all__" && !names[state.trendGm]) state.trendGm = "__all__";
+  const pick = state.trendGm;
+  const pts = weeks.map(wk=>{
+    const doc = COMPLIANCE_WEEKS[wk];
+    return trendPoint(pick === "__all__" ? weekTotalsAsGm(doc) : (doc.byGM||{})[pick], mode);
+  });
+  const rowFor = (key, gm, getG)=>{
+    const r = {key, gm, pts:{}};
+    weeks.forEach(wk=> r.pts[wk] = trendPoint(getG(COMPLIANCE_WEEKS[wk]), mode));
+    return r;
+  };
+  const totalRow = rowFor("__all__", "All GMs (Overall)", weekTotalsAsGm);
+  let rows = Object.keys(names).map(k=> rowFor(k, names[k], doc=>(doc.byGM||{})[k]));
+  rows = sortRows(rows, state.trendSort.field, state.trendSort.dir, (r,f)=> f==="gm" ? r.gm : (r.pts[f] ? r.pts[f].rate : null));
+  const cell = p=> !p ? '<td><span class="na">—</span></td>'
+    : `<td><span class="rate-txt ${rateCls(p.rate ?? 0)}">${p.rate ?? 0}%</span><span class="tsub">${p.done}/${p.elig} done · ${p.pending} pending</span></td>`;
+  const rowHtml = (r, cls)=> `<tr class="${[cls, r.key===pick?'picked':''].filter(Boolean).join(' ')}"><td class="gm-pick" data-trend-gm="${escapeHtml(r.key)}" title="Show in chart">${escapeHtml(r.gm)}</td>${weeks.map(wk=>cell(r.pts[wk])).join("")}</tr>`;
+  const modeNote = mode === "gm"
+    ? "Done = TS done by GM (on manual-eligible + auto-eligible + not-eligible sellers) · Pending = manual-eligible sellers still without a manual TS · % = Total compliance of GM. Auto/manual split started in Week 40."
+    : "Done = TS done (manual or auto) on eligible sellers · Pending = eligible sellers without a TS · % = Total compliance.";
+  return `<div class="card">
+    <h2 class="card-head-row">Weekly compliance trend <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— last ${weeks.length} weeks</span></h2>
+    <div class="trend-controls">
+      <select class="field" id="trendGmSel"><option value="__all__">All GMs</option>${Object.keys(names).sort((a,b)=>names[a].localeCompare(names[b])).map(k=>`<option value="${escapeHtml(k)}" ${k===pick?'selected':''}>${escapeHtml(names[k])}</option>`).join("")}</select>
+      <select class="field" id="trendModeSel"><option value="total" ${mode==='total'?'selected':''}>All TS (total compliance)</option><option value="gm" ${mode==='gm'?'selected':''}>GM TS (total compliance of GM)</option></select>
+    </div>
+    <div class="trend-legend"><span><i style="background:var(--accent)"></i>Done</span><span><i style="background:var(--b-pending);opacity:.78"></i>Pending</span><span>% on top = compliance</span></div>
+    ${trendChartSvg(pts, weeks)}
+    <div class="ts-meta" style="margin:4px 0 12px;">${modeNote}</div>
+    <div class="table-scroll"><table class="simple trend-table">
+      <thead><tr><th data-tsort="gm" class="sortable">GM${sortArrow("gm", state.trendSort)}</th>${weeks.map(wk=>`<th data-tsort="${wk}" class="sortable">${weekShort(wk)}${wk===weeks[weeks.length-1]?' (in progress)':''}${sortArrow(wk, state.trendSort)}<span class="tsub">${escapeHtml((COMPLIANCE_WEEKS[wk].dateRange||'').replace(/, \d{4}$/,''))}</span></th>`).join("")}</tr></thead>
+      <tbody>${rowHtml(totalRow, "total-row")}${rows.map(r=>rowHtml(r)).join("")}</tbody>
+    </table></div>
+    <div class="ts-meta" style="margin-top:6px;">Click a GM name to show them in the chart. Click a week to sort by its compliance.</div>
+  </div>`;
+}
 
 function renderCompliance(){
   const body = document.getElementById("complianceBody");
@@ -1073,14 +1204,8 @@ function renderCompliance(){
   const tileRate = r=> r==null ? "—" : r+"%";
 
   // live bucket breakdown by GM (from current SELLERS, not the frozen weekly doc)
-  const breakdownRows = GM_LIST.map(g=>{
-    const gmSellers = SELLERS.filter(s=>s.gm===g);
-    const counts = {};
-    BREAKDOWN_BUCKETS.forEach(bk=> counts[bk] = gmSellers.filter(s=>s.bucket===bk).length);
-    return {gm:g, counts};
-  });
-  const breakdownTotals = {};
-  BREAKDOWN_BUCKETS.forEach(bk=> breakdownTotals[bk] = SELLERS.filter(s=>s.bucket===bk).length);
+  const breakdownRows = sortRows(GM_LIST.map(g=>({gm:g, ...breakdownCounts(SELLERS.filter(s=>s.gm===g))})), state.bucketSort.field, state.bucketSort.dir);
+  const breakdownTotals = breakdownCounts(SELLERS);
 
   body.innerHTML = `
     <div class="stats">
@@ -1105,21 +1230,30 @@ function renderCompliance(){
       </table></div>
       ${hasSplit ? '' : '<div class="ts-meta" style="margin-top:6px;">Auto/manual split wasn\'t tracked for this week yet — only totals are available.</div>'}
     </div>
+    ${renderTrendCard()}
     <div class="card">
       <h2 class="card-head-row">Bucket totals by GM <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— click a count to see which sellers</span> <button class="btn-download-sm" data-download="bucket-breakdown" title="Download as CSV">⬇ CSV</button></h2>
-      <table class="simple">
-        <thead><tr><th>GM</th>${BREAKDOWN_BUCKETS.map(bk=>`<th>${BUCKET_META[bk].label}</th>`).join("")}</tr></thead>
+      <div class="table-scroll"><table class="simple bk-table">
+        <thead>
+          <tr><th class="grp"></th>${BREAKDOWN_GROUPS.map(bk=>`<th class="grp band grp-sep" colspan="3">${breakdownLabel(bk)}</th>`).join("")}</tr>
+          <tr><th data-bsort="gm" class="sortable">GM${sortArrow("gm", state.bucketSort)}</th>${BREAKDOWN_GROUPS.map(bk=>BK_PARTS.map(([k,l],i)=>`<th data-bsort="${bk}_${k}" class="sortable${i===0?' grp-sep':''}">${l}${sortArrow(`${bk}_${k}`, state.bucketSort)}</th>`).join("")).join("")}</tr>
+        </thead>
         <tbody>
-          <tr class="total-row"><td>All GMs (Overall)</td>${BREAKDOWN_BUCKETS.map(bk=>`<td class="mono" data-bucket-cell="${bk}" data-gm-name="" style="cursor:pointer;">${breakdownTotals[bk]}</td>`).join("")}</tr>
-          ${breakdownRows.map(r=>`<tr><td>${escapeHtml(r.gm)}</td>${BREAKDOWN_BUCKETS.map(bk=>`<td class="mono" data-bucket-cell="${bk}" data-gm-name="${escapeHtml(r.gm)}" style="cursor:${r.counts[bk]?'pointer':'default'};${r.counts[bk]?'':'color:var(--text-faint);'}">${r.counts[bk]||0}</td>`).join("")}</tr>`).join("")}
+          ${breakdownRowHtml({gm:"All GMs (Overall)", ...breakdownTotals}, "", "total-row")}
+          ${breakdownRows.map(r=>breakdownRowHtml(r, r.gm)).join("")}
         </tbody>
-      </table>
+      </table></div>
+      <div class="ts-meta" style="margin-top:6px;">Done = TS counted for that seller this week (performance buckets need a manual TS). Rest TS pending also includes auto-eligible sellers still waiting for their auto TS. Click a column to sort, or a number to see the sellers.</div>
     </div>
     ${renderZeroGmvComplianceCard(doc)}
   `;
   window._complianceRowsForExport = rows;
   window._breakdownRowsForExport = breakdownRows;
   window._breakdownTotalsForExport = breakdownTotals;
+  const tg = document.getElementById("trendGmSel");
+  if(tg) tg.addEventListener("change", e=>{ state.trendGm = e.target.value; renderCompliance(); });
+  const tm = document.getElementById("trendModeSel");
+  if(tm) tm.addEventListener("change", e=>{ state.trendMode = e.target.value; renderCompliance(); });
 }
 
 function renderZeroGmvComplianceCard(doc){
@@ -1156,10 +1290,14 @@ function wireComplianceTab(){
   if(sel) sel.addEventListener("change", e=>{ state.complianceWeek = e.target.value; renderCompliance(); });
 }
 
-function openBucketList(gmName, bucketKey){
-  const meta = BUCKET_META[bucketKey];
-  const list = gmName ? SELLERS.filter(s=>s.gm===gmName && s.bucket===bucketKey) : SELLERS.filter(s=>s.bucket===bucketKey);
+function openBucketList(gmName, bucketKey, status){
+  const inBucket = s=> bucketKey==="all" ? BREAKDOWN_BUCKETS.includes(s.bucket) : s.bucket===bucketKey;
+  let list = SELLERS.filter(s=>(!gmName || s.gm===gmName) && inBucket(s));
+  if(status==="done") list = list.filter(s=>s.tsDone);
+  else if(status==="pending") list = list.filter(s=>!s.tsDone);
   if(!list.length) return;
+  const meta = {label: breakdownLabel(bucketKey) + (status ? ` · ${status==="done" ? "Done" : "Pending"}` : "")};
+  bucketKey = bucketKey + (status ? "_" + status : "");
   window._bucketListForExport = list;
   detailScrim.innerHTML = `
     <div class="panel">
@@ -1168,7 +1306,7 @@ function openBucketList(gmName, bucketKey){
       <div class="notes-log" style="max-height:400px;">
         ${list.map(s=>`<div class="change-item" data-id="${escapeHtml(s.id)}" style="cursor:pointer;">
           <span>${escapeHtml(s.name)} <span class="sid">${escapeHtml(s.id)}</span></span>
-          <span style="color:var(--text-faint);">${escapeHtml(s.gm)}</span>
+          <span style="color:var(--text-faint);">${s.tsDone ? '<span class="status-pill done">Done</span>' : '<span class="status-pill pending">Pending</span>'} ${escapeHtml(s.gm)}</span>
         </div>`).join("")}
       </div>
       <div class="panel-actions"><button class="btn-ghost" id="closeDetailBtn">Close</button></div>
