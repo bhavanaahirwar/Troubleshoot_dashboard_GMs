@@ -253,14 +253,10 @@
   table.bk-table td.bk-pend{ color:var(--down-fg); font-weight:600; }
   table.bk-table td.bk-zero{ color:var(--text-faint); }
   .trend-controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:4px 0 10px; }
-  .trend-legend{ display:flex; gap:14px; font-size:11.5px; color:var(--text-muted); margin:2px 0 6px; }
-  .trend-legend i{ display:inline-block; width:10px; height:10px; border-radius:2px; margin-right:5px; vertical-align:-1px; }
-  .trend-chart{ width:100%; max-width:760px; height:auto; display:block; }
-  table.trend-table td, table.trend-table th{ white-space:nowrap; }
-  table.trend-table .tsub{ display:block; font-size:10.5px; color:var(--text-faint); font-weight:400; }
-  table.trend-table td.gm-pick{ cursor:pointer; }
-  table.trend-table td.gm-pick:hover{ color:var(--accent); }
-  table.trend-table tr.picked td{ background:var(--accent-soft); }
+  .trend-chart{ display:block; height:auto; min-width:100%; }
+  .trend-controls .chip{ border:1px solid var(--border); background:var(--surface); border-radius:999px; padding:6px 12px; font-size:12px; font-weight:600; color:var(--text-muted); cursor:pointer; font-family:inherit; }
+  .trend-controls .chip.active{ background:var(--accent-soft); color:var(--text); border-color:var(--accent); }
+  .trend-controls .chip i{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; vertical-align:-1px; }
   .rate-txt.hi{ color:var(--up-fg); } .rate-txt.mid{ color:var(--pending-fg); } .rate-txt.lo{ color:var(--down-fg); }
   .pend-num{ display:inline-block; min-width:26px; text-align:center; padding:1px 7px; border-radius:999px; background:var(--pending-bg); color:var(--pending-fg); font-weight:700; }
   .pend-num.zero{ background:var(--done-bg); color:var(--done-fg); }
@@ -422,7 +418,7 @@ let state = {
   collapsed: {},
   sort: { field: "w1Pnl", dir: "asc" },
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
-  bucketSort: { field: "gm", dir: "asc" }, trendGm: "__all__", trendMode: "total", trendSort: { field: "gm", dir: "asc" },
+  bucketSort: { field: "gm", dir: "asc" }, trendMode: "total", trendWeeks: null,
   moveWeek: null, moveGm: null, moveQ: "", moveRto: "all", moveSort: { field: "name", dir: "asc" },
 };
 
@@ -579,10 +575,20 @@ document.getElementById("appRoot").addEventListener("click", e=>{
 
   const bsortEl = e.target.closest("[data-bsort]");
   if(bsortEl){ toggleSort(state.bucketSort, bsortEl.dataset.bsort); renderCompliance(); return; }
-  const tsortEl = e.target.closest("[data-tsort]");
-  if(tsortEl){ toggleSort(state.trendSort, tsortEl.dataset.tsort); renderCompliance(); return; }
-  const trendGmEl = e.target.closest("[data-trend-gm]");
-  if(trendGmEl){ state.trendGm = trendGmEl.dataset.trendGm; renderCompliance(); return; }
+  const tpEl = e.target.closest("[data-tp]");
+  if(tpEl){ const [wk, key] = tpEl.dataset.tp.split("|"); openTrendPoint(wk, key); return; }
+  const twEl = e.target.closest("[data-trend-week]");
+  if(twEl){
+    const wk = twEl.dataset.trendWeek, all = trendWeekKeys();
+    if(wk === "__all__") state.trendWeeks = all.slice();
+    else {
+      const cur = new Set(state.trendWeeks || all);
+      if(state.trendWeeks && state.trendWeeks.length === all.length) { cur.clear(); cur.add(wk); }  // from "all", a click isolates that week
+      else if(cur.has(wk)) cur.delete(wk); else cur.add(wk);
+      state.trendWeeks = all.filter(w=>cur.has(w));
+    }
+    renderCompliance(); return;
+  }
 
   const sortEl = e.target.closest("[data-sort]");
   if(sortEl){
@@ -1100,13 +1106,14 @@ function breakdownRowHtml(r, gmName, cls){
   }).join("")).join("")}</tr>`;
 }
 
-// ---- week-wise compliance trend (frozen weekly docs; the current week is still in progress)
+// ---- week-wise compliance trend: x = GMs, one line per week (frozen weekly docs; the current week is still in progress)
+const TREND_COLORS = ["#94a3b8", "#f59e0b", "#7c3aed", "#2563eb", "var(--accent)"];
 function trendWeekKeys(){ return Object.keys(COMPLIANCE_WEEKS).sort().slice(-5); }
 function weekTotalsAsGm(doc){
   const gs = Object.values(doc.byGM||{});
   const split = gs.length > 0 && gs.every(g=>g.manualEligible!=null);
   const sum = k=> gs.reduce((a,g)=>a+(g[k]||0),0);
-  return {gm:"All GMs", eligible: doc.totalEligible, done: doc.totalDone,
+  return {gm:"All GMs", eligible: doc.totalEligible, done: doc.totalDone, doneManual: sum("doneManual"), doneAuto: sum("doneAuto"),
     manualEligible: split ? sum("manualEligible") : null, manualDone: split ? sum("manualDone") : null,
     manualOnAuto: split ? sum("manualOnAuto") : null, manualOnNotEligible: split ? sum("manualOnNotEligible") : null};
 }
@@ -1114,75 +1121,105 @@ function weekTotalsAsGm(doc){
 function trendPoint(g, mode){
   if(!g) return null;
   if(mode === "gm"){
-    if(g.manualEligible == null) return null;
+    if(!g.manualEligible) return null;  // nothing eligible that week: no point rather than a fake 0%
     const done = g.manualDone + (g.manualOnAuto||0) + (g.manualOnNotEligible||0);
     return {elig: g.manualEligible, done, pending: g.manualEligible - g.manualDone, rate: pctOrNull(done, g.manualEligible)};
   }
+  if(!g.eligible) return null;
   return {elig: g.eligible, done: g.done, pending: g.eligible - g.done, rate: pctOrNull(g.done, g.eligible)};
 }
 function weekShort(wk){ return "W" + wk.split("-W")[1]; }
-function trendChartSvg(pts, weeks){
-  const W = 640, H = 250, top = 34, bottom = 46, left = 12, plotH = H - top - bottom;
-  const max = Math.max(1, ...pts.map(p=> p ? p.done + p.pending : 0));
-  const slot = (W - left*2) / weeks.length, bw = Math.min(70, slot*0.55);
-  const cur = trendWeekKeys().slice(-1)[0];
-  const bars = weeks.map((wk,i)=>{
-    const p = pts[i], cx = left + slot*i + slot/2, x = cx - bw/2;
-    const doc = COMPLIANCE_WEEKS[wk];
-    const lab = `<text x="${cx}" y="${H-26}" text-anchor="middle" style="fill:var(--text);font-size:12px;font-weight:600;">${weekShort(wk)}</text>
-      <text x="${cx}" y="${H-11}" text-anchor="middle" style="fill:var(--text-faint);font-size:10px;">${escapeHtml(wk===cur ? 'in progress' : (doc.dateRange||'').replace(/, \d{4}$/,''))}</text>`;
-    if(!p) return lab + `<text x="${cx}" y="${top+plotH-6}" text-anchor="middle" style="fill:var(--text-faint);font-size:11px;">not tracked</text>`;
-    const hd = p.done/max*plotH, hp = p.pending/max*plotH, yd = top + plotH - hd, yp = yd - hp;
-    const inner = (h, y, v, fill)=> h >= 15 ? `<text x="${cx}" y="${y + h/2 + 4}" text-anchor="middle" style="fill:${fill};font-size:11px;font-weight:600;">${v}</text>` : "";
-    return `<rect x="${x}" y="${yd}" width="${bw}" height="${hd}" rx="3" style="fill:var(--accent);"><title>${weekShort(wk)}: ${p.done} done</title></rect>
-      <rect x="${x}" y="${yp}" width="${bw}" height="${hp}" rx="3" style="fill:var(--b-pending);opacity:.78;"><title>${weekShort(wk)}: ${p.pending} pending</title></rect>
-      ${inner(hd, yd, p.done, "var(--accent-contrast)")}${inner(hp, yp, p.pending, "#fff")}
-      <text x="${cx}" y="${yp-8}" text-anchor="middle" style="fill:var(--text);font-size:13px;font-weight:700;">${p.rate ?? 0}%</text>${lab}`;
-  }).join("");
-  return `<svg class="trend-chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Weekly done vs pending">
-    <line x1="${left}" x2="${W-left}" y1="${top+plotH}" y2="${top+plotH}" style="stroke:var(--border);"/>${bars}</svg>`;
-}
-function renderTrendCard(){
-  const weeks = trendWeekKeys();
-  if(weeks.length < 2) return "";
-  const mode = state.trendMode;
+function trendGms(weeks){
   const names = {};
   weeks.forEach(wk=> Object.entries(COMPLIANCE_WEEKS[wk].byGM||{}).forEach(([k,g])=> names[k] = g.gm));
-  if(state.trendGm !== "__all__" && !names[state.trendGm]) state.trendGm = "__all__";
-  const pick = state.trendGm;
-  const pts = weeks.map(wk=>{
-    const doc = COMPLIANCE_WEEKS[wk];
-    return trendPoint(pick === "__all__" ? weekTotalsAsGm(doc) : (doc.byGM||{})[pick], mode);
-  });
-  const rowFor = (key, gm, getG)=>{
-    const r = {key, gm, pts:{}};
-    weeks.forEach(wk=> r.pts[wk] = trendPoint(getG(COMPLIANCE_WEEKS[wk]), mode));
-    return r;
-  };
-  const totalRow = rowFor("__all__", "All GMs (Overall)", weekTotalsAsGm);
-  let rows = Object.keys(names).map(k=> rowFor(k, names[k], doc=>(doc.byGM||{})[k]));
-  rows = sortRows(rows, state.trendSort.field, state.trendSort.dir, (r,f)=> f==="gm" ? r.gm : (r.pts[f] ? r.pts[f].rate : null));
-  const cell = p=> !p ? '<td><span class="na">—</span></td>'
-    : `<td><span class="rate-txt ${rateCls(p.rate ?? 0)}">${p.rate ?? 0}%</span><span class="tsub">${p.done}/${p.elig} done · ${p.pending} pending</span></td>`;
-  const rowHtml = (r, cls)=> `<tr class="${[cls, r.key===pick?'picked':''].filter(Boolean).join(' ')}"><td class="gm-pick" data-trend-gm="${escapeHtml(r.key)}" title="Show in chart">${escapeHtml(r.gm)}</td>${weeks.map(wk=>cell(r.pts[wk])).join("")}</tr>`;
+  return [{key:"__all__", gm:"All GMs"}, ...Object.keys(names).sort((a,b)=>names[a].localeCompare(names[b])).map(k=>({key:k, gm:names[k]}))];
+}
+function trendGmData(wk, key){
+  const doc = COMPLIANCE_WEEKS[wk];
+  return key === "__all__" ? weekTotalsAsGm(doc) : (doc.byGM||{})[key];
+}
+function trendChartSvg(allWeeks, shown, mode){
+  const gms = trendGms(allWeeks);
+  const left = 44, right = 16, top = 16, bottom = 112, step = 46;
+  const W = Math.max(720, left + right + step * gms.length), H = 400, plotH = H - top - bottom;
+  let maxR = 100;
+  shown.forEach(wk=> gms.forEach(g=>{ const p = trendPoint(trendGmData(wk, g.key), mode); if(p && p.rate > maxR) maxR = p.rate; }));
+  maxR = Math.ceil(maxR / 20) * 20;
+  const y = r=> top + plotH - r / maxR * plotH;
+  const x = i=> left + step * i + step / 2;
+  let grid = "";
+  for(let r = 0; r <= maxR; r += 20){
+    grid += `<line x1="${left}" x2="${W-right}" y1="${y(r)}" y2="${y(r)}" style="stroke:var(--border);${r===100?'stroke-dasharray:4 3;':''}"/>
+      <text x="${left-6}" y="${y(r)+4}" text-anchor="end" style="fill:var(--text-faint);font-size:10.5px;">${r}%</text>`;
+  }
+  const labels = gms.map((g,i)=> `<text transform="translate(${x(i)+4},${top+plotH+12}) rotate(-45)" text-anchor="end" style="fill:${g.key==='__all__'?'var(--text)':'var(--text-muted)'};font-size:11px;${g.key==='__all__'?'font-weight:700;':''}">${escapeHtml(g.gm)}</text>`).join("");
+  const sep = `<line x1="${left+step}" x2="${left+step}" y1="${top}" y2="${top+plotH}" style="stroke:var(--border);"/>`;
+  const lines = shown.map(wk=>{
+    const color = trendWeekColor(allWeeks, wk);
+    const pts = gms.map((g,i)=>{ const p = trendPoint(trendGmData(wk, g.key), mode); return p ? {i, g, p} : null; });
+    let path = "", pen = false;
+    pts.forEach(q=>{ if(!q){ pen = false; return; } path += `${pen?'L':'M'}${x(q.i)},${y(q.p.rate||0)} `; pen = true; });
+    const latest = wk === allWeeks[allWeeks.length-1];
+    const dots = pts.filter(Boolean).map(q=> `<circle cx="${x(q.i)}" cy="${y(q.p.rate||0)}" r="${latest?5.5:4.5}" data-tp="${wk}|${escapeHtml(q.g.key)}" style="fill:${color};stroke:var(--surface);stroke-width:1.5;cursor:pointer;"><title>${escapeHtml(q.g.gm)} · ${weekShort(wk)}: ${q.p.rate||0}% (${q.p.done}/${q.p.elig} done, ${q.p.pending} pending)</title></circle>`).join("");
+    return `<path d="${path}" style="fill:none;stroke:${color};stroke-width:${latest?2.6:1.8};"/>${dots}`;
+  }).join("");
+  return `<div class="table-scroll"><svg class="trend-chart" viewBox="0 0 ${W} ${H}" width="${W}" role="img" aria-label="Compliance by GM, one line per week">${grid}${sep}${labels}${lines}</svg></div>`;
+}
+// each week keeps its color by position in the last-5-weeks window; the newest is the accent
+function trendWeekColor(allWeeks, wk){ return TREND_COLORS[TREND_COLORS.length - (allWeeks.length - allWeeks.indexOf(wk))] || TREND_COLORS[0]; }
+function renderTrendCard(){
+  const weeks = trendWeekKeys();
+  if(!weeks.length) return "";
+  const mode = state.trendMode;
+  if(!state.trendWeeks) state.trendWeeks = weeks.slice();
+  const shown = weeks.filter(wk=> state.trendWeeks.includes(wk));
+  const cur = weeks[weeks.length-1];
+  const chip = (val, label, on, color)=> `<button class="chip${on?' active':''}" data-trend-week="${val}">${color?`<i style="background:${color}"></i>`:''}${label}</button>`;
   const modeNote = mode === "gm"
-    ? "Done = TS done by GM (on manual-eligible + auto-eligible + not-eligible sellers) · Pending = manual-eligible sellers still without a manual TS · % = Total compliance of GM. Auto/manual split started in Week 40."
-    : "Done = TS done (manual or auto) on eligible sellers · Pending = eligible sellers without a TS · % = Total compliance.";
+    ? "% = Total compliance of GM: TS done by GM (on manual-eligible + auto-eligible + not-eligible sellers) / manual-eligible sellers. Week 39 has no auto/manual split, so it has no line here."
+    : "% = Total compliance: TS done (manual or auto) / eligible sellers.";
   return `<div class="card">
-    <h2 class="card-head-row">Weekly compliance trend <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— last ${weeks.length} weeks</span></h2>
+    <h2 class="card-head-row">Weekly compliance by GM <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— one line per week · click a point for details</span></h2>
     <div class="trend-controls">
-      <select class="field" id="trendGmSel"><option value="__all__">All GMs</option>${Object.keys(names).sort((a,b)=>names[a].localeCompare(names[b])).map(k=>`<option value="${escapeHtml(k)}" ${k===pick?'selected':''}>${escapeHtml(names[k])}</option>`).join("")}</select>
-      <select class="field" id="trendModeSel"><option value="total" ${mode==='total'?'selected':''}>All TS (total compliance)</option><option value="gm" ${mode==='gm'?'selected':''}>GM TS (total compliance of GM)</option></select>
+      ${chip("__all__", "All weeks", shown.length === weeks.length)}
+      ${weeks.map(wk=> chip(wk, weekShort(wk) + (wk===cur ? ' (in progress)' : ''), shown.includes(wk), trendWeekColor(weeks, wk))).join("")}
+      <select class="field" id="trendModeSel" style="margin-left:auto;"><option value="total" ${mode==='total'?'selected':''}>Total compliance</option><option value="gm" ${mode==='gm'?'selected':''}>Total compliance of GM</option></select>
     </div>
-    <div class="trend-legend"><span><i style="background:var(--accent)"></i>Done</span><span><i style="background:var(--b-pending);opacity:.78"></i>Pending</span><span>% on top = compliance</span></div>
-    ${trendChartSvg(pts, weeks)}
-    <div class="ts-meta" style="margin:4px 0 12px;">${modeNote}</div>
-    <div class="table-scroll"><table class="simple trend-table">
-      <thead><tr><th data-tsort="gm" class="sortable">GM${sortArrow("gm", state.trendSort)}</th>${weeks.map(wk=>`<th data-tsort="${wk}" class="sortable">${weekShort(wk)}${wk===weeks[weeks.length-1]?' (in progress)':''}${sortArrow(wk, state.trendSort)}<span class="tsub">${escapeHtml((COMPLIANCE_WEEKS[wk].dateRange||'').replace(/, \d{4}$/,''))}</span></th>`).join("")}</tr></thead>
-      <tbody>${rowHtml(totalRow, "total-row")}${rows.map(r=>rowHtml(r)).join("")}</tbody>
-    </table></div>
-    <div class="ts-meta" style="margin-top:6px;">Click a GM name to show them in the chart. Click a week to sort by its compliance.</div>
+    ${shown.length ? trendChartSvg(weeks, shown, mode) : '<div class="empty-state">Pick at least one week.</div>'}
+    <div class="ts-meta" style="margin-top:4px;">${modeNote}</div>
   </div>`;
+}
+function openTrendPoint(wk, key){
+  const g = trendGmData(wk, key);
+  if(!g) return;
+  const doc = COMPLIANCE_WEEKS[wk];
+  const split = g.manualEligible != null;
+  const onAuto = g.manualOnAuto || 0, onNot = g.manualOnNotEligible || 0;
+  const gmDone = split ? g.manualDone + onAuto + onNot : null;
+  const row = (l, v)=> `<div><label>${l}</label><div class="mono">${v==null?'—':v}</div></div>`;
+  const rate = (a,b)=> b ? Math.round(a/b*100) + "%" : "—";
+  detailScrim.innerHTML = `
+    <div class="panel" style="max-width:520px;">
+      <h2>${escapeHtml(g.gm || "All GMs")} — ${weekShort(wk)}</h2>
+      <div class="detail-meta">${escapeHtml(doc.dateRange||'')}${wk===trendWeekKeys().slice(-1)[0]?' · in progress':''}</div>
+      <div class="detail-grid">
+        ${row("Total compliance", rate(g.done, g.eligible))}
+        ${row("Total compliance of GM", split ? rate(gmDone, g.manualEligible) : null)}
+        ${row("Eligible sellers", g.eligible)}
+        ${row("TS done", `${g.done} (${g.doneManual||0} manual · ${g.doneAuto||0} auto)`)}
+        ${row("Pending", g.eligible - g.done)}
+        ${row("Manual TS compliance", split ? rate(g.manualDone, g.manualEligible) : null)}
+        ${row("Manual eligible", split ? g.manualEligible : null)}
+        ${row("TS done by GM", split ? `${gmDone} (${g.manualDone} manual-eligible + ${onAuto} auto-eligible + ${onNot} not eligible)` : null)}
+        ${row("Pending TS for GM", split ? g.manualEligible - g.manualDone : null)}
+        ${row("Auto TS", split ? `${g.autoDone ?? '—'}/${g.autoEligible ?? '—'} done` : null)}
+        ${row("Zero GMV", g.zeroGmvEligible != null ? `${g.zeroGmvDone}/${g.zeroGmvEligible} done` : null)}
+      </div>
+      ${split ? '' : '<div class="ts-meta">Auto/manual split wasn\'t tracked this week — only totals are available.</div>'}
+      <div class="panel-actions"><button class="btn-ghost" id="closeDetailBtn">Close</button></div>
+    </div>`;
+  detailScrim.hidden = false;
+  document.getElementById("closeDetailBtn").onclick = closeDetail;
 }
 
 function renderCompliance(){
@@ -1250,8 +1287,6 @@ function renderCompliance(){
   window._complianceRowsForExport = rows;
   window._breakdownRowsForExport = breakdownRows;
   window._breakdownTotalsForExport = breakdownTotals;
-  const tg = document.getElementById("trendGmSel");
-  if(tg) tg.addEventListener("change", e=>{ state.trendGm = e.target.value; renderCompliance(); });
   const tm = document.getElementById("trendModeSel");
   if(tm) tm.addEventListener("change", e=>{ state.trendMode = e.target.value; renderCompliance(); });
 }
