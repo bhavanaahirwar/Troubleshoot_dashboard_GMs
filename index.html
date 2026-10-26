@@ -445,7 +445,7 @@ let state = {
   collapsed: {},
   sort: { field: "w1Pnl", dir: "asc" },
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
-  bucketSort: { field: "gm", dir: "asc" }, trendSortBy: "current",
+  bucketSort: { field: "gm", dir: "asc" }, trendSortBy: "current", trendMetric: "manual",
   moveWeek: null, moveGm: null, moveQ: "", moveRto: "all", moveSort: { field: "name", dir: "asc" },
 };
 
@@ -618,6 +618,8 @@ document.getElementById("appRoot").addEventListener("click", e=>{
   if(bsortEl){ toggleSort(state.bucketSort, bsortEl.dataset.bsort); renderCompliance(); return; }
   const tpEl = e.target.closest("[data-tp]");
   if(tpEl){ const [wk, key] = tpEl.dataset.tp.split("|"); openTrendPoint(wk, key); return; }
+  const tmEl = e.target.closest("[data-trend-metric]");
+  if(tmEl){ state.trendMetric = tmEl.dataset.trendMetric; renderCompliance(); return; }
   const tsEl = e.target.closest("[data-trend-sort]");
   if(tsEl){ state.trendSortBy = tsEl.dataset.trendSort; renderCompliance(); return; }
 
@@ -1145,7 +1147,8 @@ function weekTotalsAsGm(doc){
   const sum = k=> gs.reduce((a,g)=>a+(g[k]||0),0);
   return {gm:"All GMs", eligible: doc.totalEligible, done: doc.totalDone, doneManual: sum("doneManual"), doneAuto: sum("doneAuto"),
     manualEligible: split ? sum("manualEligible") : null, manualDone: split ? sum("manualDone") : null,
-    manualOnAuto: split ? sum("manualOnAuto") : null, manualOnNotEligible: split ? sum("manualOnNotEligible") : null};
+    manualOnAuto: split ? sum("manualOnAuto") : null, manualOnNotEligible: split ? sum("manualOnNotEligible") : null,
+    zeroGmvEligible: sum("zeroGmvEligible"), zeroGmvDone: sum("zeroGmvDone")};
 }
 function weekShort(wk){ return "W" + wk.split("-W")[1]; }
 function trendGms(weeks){
@@ -1157,11 +1160,29 @@ function trendGmData(wk, key){
   const doc = COMPLIANCE_WEEKS[wk];
   return key === "__all__" ? weekTotalsAsGm(doc) : (doc.byGM||{})[key];
 }
-// Manual TS tracker: one row per GM, one tile per week = manual-eligible sellers with a manual TS that week.
+// Week-by-week tracker: one row per GM, one tile per week, for the metric picked above the grid.
 const LOW_MANUAL = 70;   // a full week under this counts as a "low week"
-function manualPt(g){
-  if(!g || !g.manualEligible) return null;
-  return {rate: Math.round(g.manualDone / g.manualEligible * 100), done: g.manualDone, elig: g.manualEligible, pending: g.manualEligible - g.manualDone};
+const TREND_METRICS = {
+  manual: {label: "Manual TS", title: "Manual TS compliance",
+    note: "Each tile = manual TS compliance that week: manual-eligible sellers that got a manual TS ÷ all manual-eligible sellers, with the number still pending.",
+    has: g=> g.manualEligible != null,
+    pt: g=> !g || !g.manualEligible ? null : {done: g.manualDone, elig: g.manualEligible, pending: g.manualEligible - g.manualDone}},
+  gm: {label: "Total compliance of GM", title: "Total compliance of GM",
+    note: "Each tile = total compliance of GM that week: TS done by the GM (on manual-eligible + auto-eligible + not-eligible sellers) ÷ manual-eligible sellers, with the manual-eligible sellers still pending. Can go over 100%.",
+    has: g=> g.manualEligible != null,
+    pt: g=> !g || !g.manualEligible ? null : {done: g.manualDone + (g.manualOnAuto||0) + (g.manualOnNotEligible||0), elig: g.manualEligible, pending: g.manualEligible - g.manualDone}},
+  zg: {label: "Zero GMV", title: "Zero GMV compliance",
+    note: "Each tile = Zero GMV compliance that week: Monday Zero GMV task sellers that got a TS ÷ all Zero GMV task sellers, with the number still pending.",
+    has: g=> g.zeroGmvEligible != null,
+    pt: g=> !g || !g.zeroGmvEligible ? null : {done: g.zeroGmvDone, elig: g.zeroGmvEligible, pending: g.zeroGmvEligible - g.zeroGmvDone}},
+};
+function metricPt(g, metric){
+  const p = TREND_METRICS[metric].pt(g);
+  return p ? {...p, rate: Math.round(p.done / p.elig * 100)} : null;
+}
+function allMetricsLine(g){
+  const f = m=> { const p = metricPt(g, m); return p ? `${TREND_METRICS[m].label} ${p.rate}% (${p.done}/${p.elig})` : `${TREND_METRICS[m].label} —`; };
+  return ["manual","gm","zg"].map(f).join(" · ");
 }
 function heatCls(r){ return r == null ? "h-na" : r >= 90 ? "h-4" : r >= 75 ? "h-3" : r >= LOW_MANUAL ? "h-2" : "h-1"; }
 function sparkSvg(vals){
@@ -1176,13 +1197,14 @@ function sparkSvg(vals){
     ${last ? `<circle cx="${last[0]}" cy="${last[1]}" r="2.8" style="fill:var(--accent);"/>` : ""}</svg>`;
 }
 function renderTrendCard(){
+  const metric = TREND_METRICS[state.trendMetric] ? state.trendMetric : "manual", M = TREND_METRICS[metric];
   const weeks = Object.keys(COMPLIANCE_WEEKS).sort()
-    .filter(wk=> Object.values(COMPLIANCE_WEEKS[wk].byGM||{}).some(g=>g.manualEligible != null)).slice(-6);
+    .filter(wk=> Object.values(COMPLIANCE_WEEKS[wk].byGM||{}).some(M.has)).slice(-6);
   if(!weeks.length) return "";
   const live = trendWeekKeys().slice(-1)[0];
   const full = weeks.filter(wk=> wk !== live);   // finished weeks only, for the average and the low-week count
   const build = (key, gm)=>{
-    const pts = weeks.map(wk=> manualPt(trendGmData(wk, key)));
+    const pts = weeks.map(wk=> metricPt(trendGmData(wk, key), metric));
     const fullRates = weeks.map((wk,i)=> wk !== live && pts[i] ? pts[i].rate : null).filter(v=> v != null);
     return {key, gm, pts,
       cur: pts[pts.length - 1] ? pts[pts.length - 1].rate : null,
@@ -1194,8 +1216,8 @@ function renderTrendCard(){
   const by = state.trendSortBy;
   rows = sortRows(rows, by === "name" ? "gm" : by === "avg" ? "avg" : "cur", by === "name" ? "asc" : "asc");
   const tile = (r, wk, p)=> p
-    ? `<button class="heat-tile ${heatCls(p.rate)}" data-tp="${wk}|${escapeHtml(r.key)}" title="${escapeHtml(r.gm)} · ${weekShort(wk)}: ${p.done}/${p.elig} manual TS done, ${p.pending} pending"><b>${p.rate}%</b><span>${p.pending ? p.pending + " pending" : "all done"}</span></button>`
-    : `<div class="heat-tile h-na"><b>—</b><span>${trendGmData(wk, r.key) ? "no manual sellers" : "not on roster"}</span></div>`;
+    ? `<button class="heat-tile ${heatCls(p.rate)}" data-tp="${wk}|${escapeHtml(r.key)}" title="${escapeHtml(r.gm)} · ${weekShort(wk)}: ${escapeHtml(allMetricsLine(trendGmData(wk, r.key)))}"><b>${p.rate}%</b><span>${p.pending > 0 ? p.pending + " pending" : "all done"}</span></button>`
+    : `<div class="heat-tile h-na"><b>—</b><span>${trendGmData(wk, r.key) ? (metric === "zg" ? "no Zero GMV tasks" : "no manual sellers") : "not on roster"}</span></div>`;
   const rowHtml = (r, cls)=> `<div class="heat-row ${cls||''}">
     <div class="heat-gm">${escapeHtml(r.gm)}</div>
     ${weeks.map((wk,i)=> tile(r, wk, r.pts[i])).join("")}
@@ -1205,9 +1227,11 @@ function renderTrendCard(){
   </div>`;
   const cols = `grid-template-columns: minmax(130px,170px) repeat(${weeks.length}, minmax(76px,112px)) 78px 52px 76px;`;
   const sortBtn = (v, l)=> `<button class="${by === v ? "active" : ""}" data-trend-sort="${v}">${l}</button>`;
+  const metricBtn = m=> `<button class="${metric === m ? "active" : ""}" data-trend-metric="${m}">${TREND_METRICS[m].label}</button>`;
   return `<div class="card">
-    <h2 class="card-head-row">Manual TS compliance by GM — week by week</h2>
+    <h2 class="card-head-row">${M.title} by GM — week by week</h2>
     <div class="trend-controls">
+      <div class="seg">${metricBtn("manual")}${metricBtn("gm")}${metricBtn("zg")}</div>
       <div class="seg">${sortBtn("current", "Worst this week first")}${sortBtn("avg", "Worst average first")}${sortBtn("name", "By name")}</div>
       <div class="heat-legend"><span class="heat-key h-1">&lt;${LOW_MANUAL}%</span><span class="heat-key h-2">${LOW_MANUAL}–74%</span><span class="heat-key h-3">75–89%</span><span class="heat-key h-4">90%+</span></div>
     </div>
@@ -1220,7 +1244,7 @@ function renderTrendCard(){
       ${rowHtml(total, "heat-total")}
       ${rows.map(r=> rowHtml(r)).join("")}
     </div></div>
-    <div class="ts-meta" style="margin-top:8px;">Each tile = manual TS compliance that week: manual-eligible sellers that got a manual TS ÷ all manual-eligible sellers, with the number still pending. Click a tile for the full numbers. Auto/manual tracking started in Week 40.</div>
+    <div class="ts-meta" style="margin-top:8px;">${M.note} Hover a tile to see all three metrics, or click it for the full numbers.${metric === "zg" ? "" : " Auto/manual tracking started in Week 40."}</div>
   </div>`;
 }
 function openTrendPoint(wk, key){
