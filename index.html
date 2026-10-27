@@ -255,12 +255,33 @@
   .rate-bar > div.mid{ background:#f59e0b; }
   .rate-bar > div.lo{ background:var(--down-fg); }
   .rate-txt{ font-weight:700; }
-  table.bk-table td, table.bk-table th{ text-align:center; padding:7px 8px; }
-  table.bk-table td:first-child, table.bk-table th:first-child{ text-align:left; }
-  table.bk-table td.bk-done{ color:var(--done-fg); }
-  table.bk-table td.bk-pend{ color:var(--down-fg); font-weight:600; }
-  table.bk-table td.bk-zero{ color:var(--text-faint); }
-  table.bk-table .bk-sub{ display:block; font-size:9.5px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--text-faint); }
+  table.bk-table{ border-collapse:separate; border-spacing:0; font-size:12.5px; }
+  table.bk-table td, table.bk-table th{ text-align:center; padding:8px 9px; border-bottom:1px solid var(--border); }
+  table.bk-table td:first-child, table.bk-table th:first-child{ text-align:left; position:sticky; left:0; z-index:1; background:var(--surface); }
+  table.bk-table thead th{ font-family:"Lexend","Public Sans",sans-serif; font-size:10px; font-weight:600; letter-spacing:.04em; color:var(--text-muted); white-space:nowrap; }
+  table.bk-table thead tr:first-child th{ padding:9px 9px 7px; font-size:11px; letter-spacing:.06em; }
+  table.bk-table th.bk-band-neutral{ background:var(--surface-2); color:var(--text-muted); border-radius:8px 8px 0 0; }
+  table.bk-table th.bk-band-pot{ background:color-mix(in srgb, var(--b-potential) 14%, transparent); color:var(--b-potential); border-radius:8px 8px 0 0; }
+  table.bk-table th.bk-band-bh{ background:color-mix(in srgb, var(--b-health) 14%, transparent); color:var(--b-health); border-radius:8px 8px 0 0; }
+  table.bk-table th .bk-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:0; }
+  table.bk-table .bk-sub{ display:block; font-family:"Public Sans",sans-serif; font-size:9.5px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--text-faint); margin-top:1px; }
+  table.bk-table td.bk-num{ font-family:"Public Sans",sans-serif; font-variant-numeric:tabular-nums; font-weight:600; font-size:13px; }
+  table.bk-table td.bk-count{ border-radius:0; }
+  table.bk-table td.bk-click{ cursor:pointer; }
+  table.bk-table td.bk-click:hover{ box-shadow:inset 0 0 0 2px var(--accent); }
+  table.bk-table td.bk-done{ color:var(--up-fg); }
+  table.bk-table td.bk-pend{ color:var(--down-fg); font-weight:700; }
+  table.bk-table td.bk-zero{ color:var(--text-faint); font-weight:400; }
+  table.bk-table td.bk-gm{ font-weight:600; white-space:nowrap; }
+  table.bk-table tbody tr:hover td{ background-color:color-mix(in srgb, var(--accent) 5%, transparent); }
+  table.bk-table tbody tr:hover td.bk-gm{ background:var(--accent-soft); }
+  table.bk-table tr.total-row td{ background:var(--accent-soft); font-weight:700; border-bottom:2px solid var(--accent); }
+  table.bk-table tr.total-row td.bk-gm{ color:var(--accent); }
+  .bk-rate{ display:flex; flex-direction:column; align-items:center; gap:3px; min-width:62px; }
+  .bk-pill{ font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:999px; font-variant-numeric:tabular-nums; }
+  .bk-bar{ width:52px; height:3px; border-radius:2px; background:var(--surface-2); overflow:hidden; }
+  .bk-bar i{ display:block; height:100%; border-radius:2px; }
+  .bk-bar i.hi{ background:var(--up-fg); } .bk-bar i.mid{ background:#f59e0b; } .bk-bar i.lo{ background:var(--down-fg); }
   .trend-controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:4px 0 10px; }
 
   .heat-grid{ display:grid; min-width:max-content; gap:3px 5px; align-items:center; }
@@ -1179,16 +1200,27 @@ function breakdownCounts(list){
   });
   return c;
 }
-function breakdownRowHtml(r, gmName, cls){
-  const cell = (bk, k, sep)=>{
-    const v = r[`${bk}_${k}`] || 0;
-    const tone = !v ? "bk-zero" : k==="d" ? "bk-done" : k==="p" ? "bk-pend" : "";
-    return `<td class="mono ${tone}${sep?' grp-sep':''}" data-bucket-cell="${bk}" data-gm-name="${escapeHtml(gmName)}" data-status="${k==='d'?'done':k==='p'?'pending':''}" style="cursor:${v?'pointer':'default'};">${v}</td>`;
+function breakdownRowHtml(r, gmName, cls, max){
+  // conditional formatting: bucket counts tinted by size vs the column's largest GM; pending tinted by its share of the group
+  const tint = (color, ratio, top = 45)=> ratio > 0 ? `background:color-mix(in srgb, ${color} ${Math.round(8 + top * Math.min(1, ratio))}%, transparent);` : "";
+  const attrs = (bk, k, v)=> `data-bucket-cell="${bk}" data-gm-name="${escapeHtml(gmName)}" data-status="${k==='d'?'done':k==='p'?'pending':''}"${v ? ' tabindex="0"' : ''}`;
+  const countCell = (bk, sep)=>{
+    const v = r[`${bk}_t`] || 0;
+    return `<td class="bk-num bk-count${v?' bk-click':' bk-zero'}${sep?' grp-sep':''}" ${attrs(bk,'t',v)} style="${cls ? '' : tint(BUCKET_META[bk].color, max && max[bk] ? v / max[bk] : 0)}">${v}</td>`;
   };
-  const rate = (g)=>{ const v = r[`${g}_r`]; return `<td>${v == null ? '<span class="na">—</span>' : `<span class="rate-txt ${rateCls(v)}">${v}%</span>`}</td>`; };
-  return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(r.gm)}</td>`
-    + BREAKDOWN_BUCKETS.map((bk,i)=> cell(bk, "t", i===0)).join("")
-    + Object.keys(BK_GROUPS).map(g=> cell(g,"t",true) + cell(g,"d") + cell(g,"p") + rate(g)).join("")
+  const groupCells = g=>{
+    const t = r[`${g}_t`] || 0, d = r[`${g}_d`] || 0, p = r[`${g}_p`] || 0, rt = r[`${g}_r`];
+    const pendStyle = p ? tint("var(--down-fg)", t ? p / t : 0, 22) : "";
+    const rate = rt == null ? '<span class="na">—</span>'
+      : `<div class="bk-rate"><span class="bk-pill ${heatCls(rt)}">${rt}%</span><span class="bk-bar"><i class="${rateCls(rt)}" style="width:${rt}%"></i></span></div>`;
+    return `<td class="bk-num grp-sep${t?' bk-click':' bk-zero'}" ${attrs(g,'t',t)}><b>${t}</b></td>`
+      + `<td class="bk-num${d?' bk-click bk-done':' bk-zero'}" ${attrs(g,'d',d)}>${d}</td>`
+      + `<td class="bk-num${p?' bk-click bk-pend':' bk-zero'}" ${attrs(g,'p',p)} style="${pendStyle}">${p}</td>`
+      + `<td class="bk-ratecell">${rate}</td>`;
+  };
+  return `<tr${cls?` class="${cls}"`:''}><td class="bk-gm">${escapeHtml(r.gm)}</td>`
+    + BREAKDOWN_BUCKETS.map((bk,i)=> countCell(bk, i===0)).join("")
+    + Object.keys(BK_GROUPS).map(groupCells).join("")
     + `</tr>`;
 }
 
@@ -1354,6 +1386,7 @@ function renderCompliance(){
   // live bucket breakdown by GM (from current SELLERS, not the frozen weekly doc)
   const breakdownRows = sortRows(GM_LIST.map(g=>({gm:g, ...breakdownCounts(SELLERS.filter(s=>s.gm===g))})), state.bucketSort.field, state.bucketSort.dir);
   const breakdownTotals = breakdownCounts(SELLERS);
+  const breakdownMax = Object.fromEntries(BREAKDOWN_BUCKETS.map(bk=>[bk, Math.max(1, ...breakdownRows.map(r=>r[bk+"_t"]||0))]));
 
   body.innerHTML = `
     <div class="stats">
@@ -1383,12 +1416,12 @@ function renderCompliance(){
       <h2 class="card-head-row">Bucket totals by GM <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— click a count to see which sellers</span> <button class="btn-download-sm" data-download="bucket-breakdown" title="Download as CSV">⬇ CSV</button></h2>
       <div class="table-scroll"><table class="simple bk-table">
         <thead>
-          <tr><th class="grp"></th><th class="grp band grp-sep" colspan="4">Sellers per bucket</th>${Object.keys(BK_GROUPS).map(g=>`<th class="grp band grp-sep" colspan="4">${BK_GROUPS[g].label}<span class="bk-sub">${BK_GROUPS[g].sub}</span></th>`).join("")}</tr>
-          <tr><th data-bsort="gm" class="sortable">GM${sortArrow("gm", state.bucketSort)}</th>${BREAKDOWN_BUCKETS.map((bk,i)=>`<th data-bsort="${bk}_t" class="sortable${i===0?' grp-sep':''}">${bk==="bucket_health" ? "BH sellers" : BUCKET_META[bk].label}${sortArrow(`${bk}_t`, state.bucketSort)}</th>`).join("")}${Object.keys(BK_GROUPS).map(g=>BK_PARTS.map(([k,l],i)=>`<th data-bsort="${g}_${k}" class="sortable${i===0?' grp-sep':''}">${l}${sortArrow(`${g}_${k}`, state.bucketSort)}</th>`).join("")).join("")}</tr>
+          <tr><th></th><th class="bk-band-neutral grp-sep" colspan="4">SELLERS PER BUCKET</th>${Object.keys(BK_GROUPS).map(g=>`<th class="bk-band-${g==='pot'?'pot':'bh'} grp-sep" colspan="4">${BK_GROUPS[g].label.toUpperCase()}<span class="bk-sub">${BK_GROUPS[g].sub}</span></th>`).join("")}</tr>
+          <tr><th data-bsort="gm" class="sortable">GM${sortArrow("gm", state.bucketSort)}</th>${BREAKDOWN_BUCKETS.map((bk,i)=>`<th data-bsort="${bk}_t" class="sortable${i===0?' grp-sep':''}"><span class="bk-dot" style="background:${BUCKET_META[bk].color}"></span>${bk==="bucket_health" ? "BH sellers" : bk==="potential" ? "Potential" : BUCKET_META[bk].label}${sortArrow(`${bk}_t`, state.bucketSort)}</th>`).join("")}${Object.keys(BK_GROUPS).map(g=>BK_PARTS.map(([k,l],i)=>`<th data-bsort="${g}_${k}" class="sortable${i===0?' grp-sep':''}">${l}${sortArrow(`${g}_${k}`, state.bucketSort)}</th>`).join("")).join("")}</tr>
         </thead>
         <tbody>
           ${breakdownRowHtml({gm:"All GMs (Overall)", ...breakdownTotals}, "", "total-row")}
-          ${breakdownRows.map(r=>breakdownRowHtml(r, r.gm)).join("")}
+          ${breakdownRows.map(r=>breakdownRowHtml(r, r.gm, "", breakdownMax)).join("")}
         </tbody>
       </table></div>
       <div class="ts-meta" style="margin-top:6px;">Total potentials = Potential + Breakeven Potential. Total BH = Objective Hit + Potential + Breakeven Potential + Bucket Health. TS done = a manual TS logged this week (these buckets always need a manual TS). Click a column to sort, or a number to see the sellers.</div>
