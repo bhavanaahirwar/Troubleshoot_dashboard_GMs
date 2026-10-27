@@ -255,31 +255,31 @@
   .rate-bar > div.mid{ background:#f59e0b; }
   .rate-bar > div.lo{ background:var(--down-fg); }
   .rate-txt{ font-weight:700; }
-  table.bk-table{ border-collapse:separate; border-spacing:0; font-size:12.5px; }
-  table.bk-table td, table.bk-table th{ text-align:center; padding:8px 9px; border-bottom:1px solid var(--border); }
+  table.bk-table{ border-collapse:separate; border-spacing:0; font-size:11.5px; width:auto; }
+  table.bk-table td, table.bk-table th{ text-align:center; padding:4px 7px; border-bottom:1px solid var(--border); line-height:1.25; }
   table.bk-table td:first-child, table.bk-table th:first-child{ text-align:left; position:sticky; left:0; z-index:1; background:var(--surface); }
-  table.bk-table thead th{ font-family:"Lexend","Public Sans",sans-serif; font-size:10px; font-weight:600; letter-spacing:.04em; color:var(--text-muted); white-space:nowrap; }
-  table.bk-table thead tr:first-child th{ padding:9px 9px 7px; font-size:11px; letter-spacing:.06em; }
+  table.bk-table thead th{ font-family:"Lexend","Public Sans",sans-serif; font-size:9px; font-weight:600; letter-spacing:.03em; color:var(--text-muted); white-space:nowrap; padding:5px 7px; }
+  table.bk-table thead tr:first-child th{ padding:5px 7px 4px; font-size:9.5px; letter-spacing:.05em; }
   table.bk-table th.bk-band-neutral{ background:var(--surface-2); color:var(--text-muted); border-radius:8px 8px 0 0; }
   table.bk-table th.bk-band-pot{ background:color-mix(in srgb, var(--b-potential) 14%, transparent); color:var(--b-potential); border-radius:8px 8px 0 0; }
   table.bk-table th.bk-band-bh{ background:color-mix(in srgb, var(--b-health) 14%, transparent); color:var(--b-health); border-radius:8px 8px 0 0; }
-  table.bk-table th .bk-dot{ display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:5px; vertical-align:0; }
-  table.bk-table .bk-sub{ display:block; font-family:"Public Sans",sans-serif; font-size:9.5px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--text-faint); margin-top:1px; }
-  table.bk-table td.bk-num{ font-family:"Public Sans",sans-serif; font-variant-numeric:tabular-nums; font-weight:600; font-size:13px; }
+  table.bk-table th .bk-dot{ display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; vertical-align:1px; }
+  table.bk-table .bk-sub{ display:inline; font-family:"Public Sans",sans-serif; font-size:9px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--text-faint); margin-left:5px; }
+  table.bk-table td.bk-num{ font-family:"Public Sans",sans-serif; font-variant-numeric:tabular-nums; font-weight:600; font-size:11.5px; min-width:34px; }
   table.bk-table td.bk-count{ border-radius:0; }
   table.bk-table td.bk-click{ cursor:pointer; }
   table.bk-table td.bk-click:hover{ box-shadow:inset 0 0 0 2px var(--accent); }
   table.bk-table td.bk-done{ color:var(--up-fg); }
   table.bk-table td.bk-pend{ color:var(--down-fg); font-weight:700; }
   table.bk-table td.bk-zero{ color:var(--text-faint); font-weight:400; }
-  table.bk-table td.bk-gm{ font-weight:600; white-space:nowrap; }
+  table.bk-table td.bk-gm{ font-weight:600; white-space:nowrap; font-size:11.5px; padding-right:12px; }
   table.bk-table tbody tr:hover td{ background-color:color-mix(in srgb, var(--accent) 5%, transparent); }
   table.bk-table tbody tr:hover td.bk-gm{ background:var(--accent-soft); }
   table.bk-table tr.total-row td{ background:var(--accent-soft); font-weight:700; border-bottom:2px solid var(--accent); }
   table.bk-table tr.total-row td.bk-gm{ color:var(--accent); }
-  .bk-rate{ display:flex; flex-direction:column; align-items:center; gap:3px; min-width:62px; }
-  .bk-pill{ font-size:11.5px; font-weight:700; padding:2px 8px; border-radius:999px; font-variant-numeric:tabular-nums; }
-  .bk-bar{ width:52px; height:3px; border-radius:2px; background:var(--surface-2); overflow:hidden; }
+  .bk-rate{ display:flex; align-items:center; justify-content:center; }
+  .bk-pill{ font-size:10.5px; font-weight:700; padding:1px 7px; border-radius:999px; font-variant-numeric:tabular-nums; min-width:38px; display:inline-block; }
+  .bk-bar{ display:none; }
   .bk-bar i{ display:block; height:100%; border-radius:2px; }
   .bk-bar i.hi{ background:var(--up-fg); } .bk-bar i.mid{ background:#f59e0b; } .bk-bar i.lo{ background:var(--down-fg); }
   .trend-controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:4px 0 10px; }
@@ -1182,7 +1182,7 @@ const BK_GROUPS = {
   pot: {label: "Total potentials", sub: "Potential + Breakeven", members: ["potential","breakeven_potential"]},
   bhall: {label: "Total BH", sub: "Objective + Potentials + BH", members: BREAKDOWN_BUCKETS},
 };
-const BK_PARTS = [["t","Total"],["d","TS done"],["p","TS pending"],["r","TS complete %"]];
+const BK_PARTS = [["t","Total"],["d","Done"],["p","Pending"],["r","Done %"]];
 function bkMembers(key){ return BK_GROUPS[key] ? BK_GROUPS[key].members : [key]; }
 function breakdownLabel(bk){ return BK_GROUPS[bk] ? BK_GROUPS[bk].label : BUCKET_META[bk].label; }
 function toggleSort(st, field){
@@ -1417,7 +1417,7 @@ function renderCompliance(){
       <div class="table-scroll"><table class="simple bk-table">
         <thead>
           <tr><th></th><th class="bk-band-neutral grp-sep" colspan="4">SELLERS PER BUCKET</th>${Object.keys(BK_GROUPS).map(g=>`<th class="bk-band-${g==='pot'?'pot':'bh'} grp-sep" colspan="4">${BK_GROUPS[g].label.toUpperCase()}<span class="bk-sub">${BK_GROUPS[g].sub}</span></th>`).join("")}</tr>
-          <tr><th data-bsort="gm" class="sortable">GM${sortArrow("gm", state.bucketSort)}</th>${BREAKDOWN_BUCKETS.map((bk,i)=>`<th data-bsort="${bk}_t" class="sortable${i===0?' grp-sep':''}"><span class="bk-dot" style="background:${BUCKET_META[bk].color}"></span>${bk==="bucket_health" ? "BH sellers" : bk==="potential" ? "Potential" : BUCKET_META[bk].label}${sortArrow(`${bk}_t`, state.bucketSort)}</th>`).join("")}${Object.keys(BK_GROUPS).map(g=>BK_PARTS.map(([k,l],i)=>`<th data-bsort="${g}_${k}" class="sortable${i===0?' grp-sep':''}">${l}${sortArrow(`${g}_${k}`, state.bucketSort)}</th>`).join("")).join("")}</tr>
+          <tr><th data-bsort="gm" class="sortable">GM${sortArrow("gm", state.bucketSort)}</th>${BREAKDOWN_BUCKETS.map((bk,i)=>`<th data-bsort="${bk}_t" class="sortable${i===0?' grp-sep':''}"><span class="bk-dot" style="background:${BUCKET_META[bk].color}"></span>${({objective_hit:"Obj. hit", potential:"Potential", breakeven_potential:"Breakeven", bucket_health:"BH"})[bk]}${sortArrow(`${bk}_t`, state.bucketSort)}</th>`).join("")}${Object.keys(BK_GROUPS).map(g=>BK_PARTS.map(([k,l],i)=>`<th data-bsort="${g}_${k}" class="sortable${i===0?' grp-sep':''}">${l}${sortArrow(`${g}_${k}`, state.bucketSort)}</th>`).join("")).join("")}</tr>
         </thead>
         <tbody>
           ${breakdownRowHtml({gm:"All GMs (Overall)", ...breakdownTotals}, "", "total-row")}
