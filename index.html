@@ -260,6 +260,7 @@
   table.bk-table td.bk-done{ color:var(--done-fg); }
   table.bk-table td.bk-pend{ color:var(--down-fg); font-weight:600; }
   table.bk-table td.bk-zero{ color:var(--text-faint); }
+  table.bk-table .bk-sub{ display:block; font-size:9.5px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--text-faint); }
   .trend-controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:4px 0 10px; }
 
   .heat-grid{ display:grid; min-width:max-content; gap:3px 5px; align-items:center; }
@@ -712,7 +713,8 @@ document.getElementById("appRoot").addEventListener("click", e=>{
     } else if(kind === "bucket-breakdown"){
       const rows = [{gm:"All GMs (Overall)", ...(window._breakdownTotalsForExport||{})}, ...(window._breakdownRowsForExport||[])];
       downloadCsv(`bucket_totals_by_gm.csv`, rows, [
-        {key:"gm",label:"GM"}, ...BREAKDOWN_GROUPS.flatMap(bk=>BK_PARTS.map(([k,l])=>({key:`${bk}_${k}`, label:`${breakdownLabel(bk)} - ${l}`}))),
+        {key:"gm",label:"GM"}, ...BREAKDOWN_BUCKETS.map(bk=>({key:`${bk}_t`, label:BUCKET_META[bk].label})),
+        ...Object.keys(BK_GROUPS).flatMap(g=>BK_PARTS.map(([k,l])=>({key:`${g}_${k}`, label:`${BK_GROUPS[g].label} - ${l}`}))),
       ]);
     } else if(kind === "movement"){
       const rows = window._movementRowsForExport || [];
@@ -1153,30 +1155,41 @@ function complianceRowHtml(g, cls){
     <td>${rateCell(g.manualRate)}</td><td>${rateCell(g.gmRate)}</td><td>${pendCell(g.gmPending)}</td>
     <td class="grp-sep">${numCell(g.autoEligible)}</td><td>${numCell(g.autoDone)}</td><td>${rateCell(g.autoRate)}</td></tr>`;
 }
-const BREAKDOWN_BUCKETS = ["objective_hit","potential","breakeven_potential","bucket_health","rest_ts_pending"];
-const BREAKDOWN_GROUPS = [...BREAKDOWN_BUCKETS, "all"];
-const BK_PARTS = [["t","Total"],["d","Done"],["p","Pending"]];
-function breakdownLabel(bk){ return bk==="all" ? "All buckets" : BUCKET_META[bk].label; }
+const BREAKDOWN_BUCKETS = ["objective_hit","potential","breakeven_potential","bucket_health"];
+// grouped columns: Total potentials = Potential + Breakeven Potential; Total BH = all four performance buckets
+const BK_GROUPS = {
+  pot: {label: "Total potentials", sub: "Potential + Breakeven", members: ["potential","breakeven_potential"]},
+  bhall: {label: "Total BH", sub: "Objective + Potentials + BH", members: BREAKDOWN_BUCKETS},
+};
+const BK_PARTS = [["t","Total"],["d","TS done"],["p","TS pending"],["r","TS complete %"]];
+function bkMembers(key){ return BK_GROUPS[key] ? BK_GROUPS[key].members : [key]; }
+function breakdownLabel(bk){ return BK_GROUPS[bk] ? BK_GROUPS[bk].label : BUCKET_META[bk].label; }
 function toggleSort(st, field){
   if(st.field === field) st.dir = st.dir === "asc" ? "desc" : "asc";
   else { st.field = field; st.dir = field === "gm" ? "asc" : "desc"; }
 }
-// per bucket: <bk>_t total, <bk>_d TS done, <bk>_p pending (flat keys so every column can be sorted)
+// flat keys so every column can be sorted: <bucket>_t count per bucket; <group>_t/_d/_p/_r total, done, pending, complete %
 function breakdownCounts(list){
   const c = {};
-  BREAKDOWN_GROUPS.forEach(bk=>{
-    const ss = list.filter(s=> bk==="all" ? BREAKDOWN_BUCKETS.includes(s.bucket) : s.bucket===bk);
+  BREAKDOWN_BUCKETS.forEach(bk=> c[bk+"_t"] = list.filter(s=>s.bucket===bk).length);
+  Object.keys(BK_GROUPS).forEach(g=>{
+    const ss = list.filter(s=> bkMembers(g).includes(s.bucket));
     const d = ss.filter(s=>s.tsDone).length;
-    c[bk+"_t"] = ss.length; c[bk+"_d"] = d; c[bk+"_p"] = ss.length - d;
+    c[g+"_t"] = ss.length; c[g+"_d"] = d; c[g+"_p"] = ss.length - d; c[g+"_r"] = ss.length ? Math.round(d / ss.length * 100) : null;
   });
   return c;
 }
 function breakdownRowHtml(r, gmName, cls){
-  return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(r.gm)}</td>${BREAKDOWN_GROUPS.map(bk=>BK_PARTS.map(([k],i)=>{
+  const cell = (bk, k, sep)=>{
     const v = r[`${bk}_${k}`] || 0;
     const tone = !v ? "bk-zero" : k==="d" ? "bk-done" : k==="p" ? "bk-pend" : "";
-    return `<td class="mono ${tone}${i===0?' grp-sep':''}" data-bucket-cell="${bk}" data-gm-name="${escapeHtml(gmName)}" data-status="${k==='d'?'done':k==='p'?'pending':''}" style="cursor:${v?'pointer':'default'};">${v}</td>`;
-  }).join("")).join("")}</tr>`;
+    return `<td class="mono ${tone}${sep?' grp-sep':''}" data-bucket-cell="${bk}" data-gm-name="${escapeHtml(gmName)}" data-status="${k==='d'?'done':k==='p'?'pending':''}" style="cursor:${v?'pointer':'default'};">${v}</td>`;
+  };
+  const rate = (g)=>{ const v = r[`${g}_r`]; return `<td>${v == null ? '<span class="na">—</span>' : `<span class="rate-txt ${rateCls(v)}">${v}%</span>`}</td>`; };
+  return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(r.gm)}</td>`
+    + BREAKDOWN_BUCKETS.map((bk,i)=> cell(bk, "t", i===0)).join("")
+    + Object.keys(BK_GROUPS).map(g=> cell(g,"t",true) + cell(g,"d") + cell(g,"p") + rate(g)).join("")
+    + `</tr>`;
 }
 
 // ---- week-by-week compliance (frozen weekly docs; the current week is still in progress)
@@ -1370,15 +1383,15 @@ function renderCompliance(){
       <h2 class="card-head-row">Bucket totals by GM <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— click a count to see which sellers</span> <button class="btn-download-sm" data-download="bucket-breakdown" title="Download as CSV">⬇ CSV</button></h2>
       <div class="table-scroll"><table class="simple bk-table">
         <thead>
-          <tr><th class="grp"></th>${BREAKDOWN_GROUPS.map(bk=>`<th class="grp band grp-sep" colspan="3">${breakdownLabel(bk)}</th>`).join("")}</tr>
-          <tr><th data-bsort="gm" class="sortable">GM${sortArrow("gm", state.bucketSort)}</th>${BREAKDOWN_GROUPS.map(bk=>BK_PARTS.map(([k,l],i)=>`<th data-bsort="${bk}_${k}" class="sortable${i===0?' grp-sep':''}">${l}${sortArrow(`${bk}_${k}`, state.bucketSort)}</th>`).join("")).join("")}</tr>
+          <tr><th class="grp"></th><th class="grp band grp-sep" colspan="4">Sellers per bucket</th>${Object.keys(BK_GROUPS).map(g=>`<th class="grp band grp-sep" colspan="4">${BK_GROUPS[g].label}<span class="bk-sub">${BK_GROUPS[g].sub}</span></th>`).join("")}</tr>
+          <tr><th data-bsort="gm" class="sortable">GM${sortArrow("gm", state.bucketSort)}</th>${BREAKDOWN_BUCKETS.map((bk,i)=>`<th data-bsort="${bk}_t" class="sortable${i===0?' grp-sep':''}">${bk==="bucket_health" ? "BH sellers" : BUCKET_META[bk].label}${sortArrow(`${bk}_t`, state.bucketSort)}</th>`).join("")}${Object.keys(BK_GROUPS).map(g=>BK_PARTS.map(([k,l],i)=>`<th data-bsort="${g}_${k}" class="sortable${i===0?' grp-sep':''}">${l}${sortArrow(`${g}_${k}`, state.bucketSort)}</th>`).join("")).join("")}</tr>
         </thead>
         <tbody>
           ${breakdownRowHtml({gm:"All GMs (Overall)", ...breakdownTotals}, "", "total-row")}
           ${breakdownRows.map(r=>breakdownRowHtml(r, r.gm)).join("")}
         </tbody>
       </table></div>
-      <div class="ts-meta" style="margin-top:6px;">Done = TS counted for that seller this week (performance buckets need a manual TS). Rest TS pending also includes auto-eligible sellers still waiting for their auto TS. Click a column to sort, or a number to see the sellers.</div>
+      <div class="ts-meta" style="margin-top:6px;">Total potentials = Potential + Breakeven Potential. Total BH = Objective Hit + Potential + Breakeven Potential + Bucket Health. TS done = a manual TS logged this week (these buckets always need a manual TS). Click a column to sort, or a number to see the sellers.</div>
     </div>
     ${renderZeroGmvComplianceCard(doc)}
   `;
@@ -1422,7 +1435,7 @@ function wireComplianceTab(){
 }
 
 function openBucketList(gmName, bucketKey, status){
-  const inBucket = s=> bucketKey==="all" ? BREAKDOWN_BUCKETS.includes(s.bucket) : s.bucket===bucketKey;
+  const inBucket = s=> bkMembers(bucketKey).includes(s.bucket);
   let list = SELLERS.filter(s=>(!gmName || s.gm===gmName) && inBucket(s));
   if(status==="done") list = list.filter(s=>s.tsDone);
   else if(status==="pending") list = list.filter(s=>!s.tsDone);
