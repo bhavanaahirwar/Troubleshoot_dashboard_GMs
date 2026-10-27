@@ -258,15 +258,22 @@
   table.bk-table{ border-collapse:separate; border-spacing:0; font-size:11.5px; width:auto; }
   table.bk-table td, table.bk-table th{ text-align:center; padding:4px 7px; border-bottom:1px solid var(--border); line-height:1.25; }
   table.bk-table td:first-child, table.bk-table th:first-child{ text-align:left; position:sticky; left:0; z-index:1; background:var(--surface); }
-  table.bk-table thead th{ font-family:"Lexend","Public Sans",sans-serif; font-size:9px; font-weight:600; letter-spacing:.03em; color:var(--text-muted); white-space:nowrap; padding:5px 7px; }
-  table.bk-table thead tr:first-child th{ padding:5px 7px 4px; font-size:9.5px; letter-spacing:.05em; }
+  table.bk-table thead th{ font-family:"Lexend","Public Sans",sans-serif; font-size:10px; font-weight:600; letter-spacing:.03em; color:var(--text-muted); white-space:nowrap; padding:5px 7px; }
+  table.bk-table thead tr:first-child th{ padding:6px 7px 5px; font-size:10.5px; letter-spacing:.05em; }
   table.bk-table th.bk-band-neutral{ background:var(--surface-2); color:var(--text-muted); border-radius:8px 8px 0 0; }
   table.bk-table th.bk-band-pot{ background:color-mix(in srgb, var(--b-potential) 14%, transparent); color:var(--b-potential); border-radius:8px 8px 0 0; }
   table.bk-table th.bk-band-bh{ background:color-mix(in srgb, var(--b-health) 14%, transparent); color:var(--b-health); border-radius:8px 8px 0 0; }
   table.bk-table th .bk-dot{ display:inline-block; width:6px; height:6px; border-radius:50%; margin-right:4px; vertical-align:1px; }
-  table.bk-table .bk-sub{ display:inline; font-family:"Public Sans",sans-serif; font-size:9px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--text-faint); margin-left:5px; }
+  table.bk-table .bk-sub{ display:inline; font-family:"Public Sans",sans-serif; font-size:10px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--text-faint); margin-left:5px; }
   table.bk-table td.bk-num{ font-family:"Public Sans",sans-serif; font-variant-numeric:tabular-nums; font-weight:600; font-size:11.5px; min-width:34px; }
   table.bk-table td.bk-count{ border-radius:0; }
+  /* bold frame around each block (GM | sellers per bucket | total potentials | total BH) so they read as separate tables */
+  table.bk-table{ --bk-frame: color-mix(in srgb, var(--text) 45%, transparent); border:2px solid var(--bk-frame); border-radius:8px; }
+  table.bk-table td.grp-sep, table.bk-table th.grp-sep{ border-left:2px solid var(--bk-frame); }
+  table.bk-table td:first-child, table.bk-table th:first-child{ border-right:2px solid var(--bk-frame); }
+  table.bk-table thead tr:first-child th{ border-bottom:2px solid var(--bk-frame); }
+  table.bk-table thead tr:last-child th{ border-bottom:2px solid var(--bk-frame); }
+  table.bk-table th.bk-band-neutral, table.bk-table th.bk-band-pot, table.bk-table th.bk-band-bh{ border-radius:0; }
   table.bk-table td.bk-click{ cursor:pointer; }
   table.bk-table td.bk-click:hover{ box-shadow:inset 0 0 0 2px var(--accent); }
   table.bk-table td.bk-done{ color:var(--up-fg); }
