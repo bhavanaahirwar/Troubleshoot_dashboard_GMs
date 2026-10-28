@@ -195,6 +195,15 @@
   .field{ margin-bottom:0; }
   .field label{ display:block; font-size:11px; font-weight:600; color:var(--text-muted); margin-bottom:6px; text-transform:uppercase; letter-spacing:.03em; }
   .panel-actions{ display:flex; justify-content:flex-end; gap:8px; margin-top:18px; }
+  .list-panel{ max-width:560px; max-height:min(86vh, 720px); display:flex; flex-direction:column; margin-bottom:0; }
+  .list-panel .seller-list{ flex:1; min-height:0; overflow-y:auto; margin-top:10px; border:1px solid var(--border); border-radius:10px; }
+  .list-panel .panel-actions{ margin-top:12px; }
+  .seller-li{ display:flex; align-items:center; justify-content:space-between; gap:10px; padding:7px 12px; cursor:pointer; }
+  .seller-li:last-child{ border-bottom:none; }
+  .seller-li:hover{ background:var(--surface-2); }
+  .seller-li .sl-main{ min-width:0; }
+  .seller-li .sl-name{ font-weight:600; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .seller-li .status-pill{ flex-shrink:0; }
   .btn-ghost{ background:none; border:1px solid var(--border); border-radius:9px; padding:9px 14px; font-size:13px; font-weight:600; color:var(--text-muted); }
   .btn-ghost:hover{ background:var(--surface-2); }
 
@@ -1484,13 +1493,13 @@ function openBucketList(gmName, bucketKey, status){
   bucketKey = bucketKey + (status ? "_" + status : "");
   window._bucketListForExport = list;
   detailScrim.innerHTML = `
-    <div class="panel">
+    <div class="panel list-panel">
       <h2 class="card-head-row">${meta.label}${gmName?` — ${escapeHtml(gmName)}`:' — All GMs'} <button class="btn-download-sm" data-download="bucket-list" data-bucket-key="${bucketKey}${gmName?'_'+slugify(gmName):''}" title="Download as CSV">⬇ CSV</button></h2>
-      <div class="detail-meta">${list.length} seller${list.length===1?'':'s'}</div>
-      <div class="notes-log" style="max-height:400px;">
-        ${list.map(s=>`<div class="change-item" data-id="${escapeHtml(s.id)}" style="cursor:pointer;">
-          <span>${escapeHtml(s.name)} <span class="sid">${escapeHtml(s.id)}</span></span>
-          <span style="color:var(--text-faint);">${s.tsDone ? '<span class="status-pill done">Done</span>' : '<span class="status-pill pending">Pending</span>'} ${escapeHtml(s.gm)}</span>
+      <div class="detail-meta">${list.length} seller${list.length===1?'':'s'} · ${list.filter(s=>s.tsDone).length} done · ${list.filter(s=>!s.tsDone).length} pending</div>
+      <div class="seller-list">
+        ${list.map(s=>`<div class="seller-li change-item" data-id="${escapeHtml(s.id)}">
+          <div class="sl-main"><div class="sl-name">${escapeHtml(s.name || s.company || s.id)}</div><div class="sid">${escapeHtml(s.id)}${gmName ? '' : ` · ${escapeHtml(s.gm)}`}</div></div>
+          ${s.tsDone ? '<span class="status-pill done">Done</span>' : '<span class="status-pill pending">Pending</span>'}
         </div>`).join("")}
       </div>
       <div class="panel-actions"><button class="btn-ghost" id="closeDetailBtn">Close</button></div>
