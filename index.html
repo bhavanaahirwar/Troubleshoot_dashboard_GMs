@@ -355,49 +355,42 @@
   .stat-tile{ text-align:center; }
   @media (max-width:980px){ .row > div:nth-child(n+4){ text-align:left; } }
   @media (max-width:980px){ .stats{ grid-template-columns:repeat(2,1fr); } }
+  .hd-i{ color:var(--accent); cursor:help; }
 
-  /* ---- seller rows: grouped, bordered layout (2026-11-02) ---- */
-  .row-head, .row{ grid-template-columns: minmax(150px,1.5fr) minmax(110px,1fr) repeat(2, minmax(118px,1fr)) minmax(80px,.7fr) minmax(124px,1fr) minmax(80px,.75fr) minmax(130px,1.1fr); gap:0; padding:0 6px; }
-  .row-head > div, .row > div{ padding:9px 10px; }
-  .row-head{ background:var(--surface-2); border-bottom:1px solid var(--border); }
-  .row-head > div{ display:flex; flex-direction:column; justify-content:flex-end; gap:3px; }
-  .row-head > div:nth-child(n+3){ align-items:center; }
-  .hd-group{ font-family:"Lexend","Public Sans",sans-serif; font-size:9.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--text-muted); white-space:nowrap; }
-  .hd-i{ color:var(--accent); cursor:help; text-transform:none; }
-  .hd-subs{ display:flex; gap:4px; flex-wrap:wrap; }
-  .row-head > div:nth-child(n+3) .hd-subs{ justify-content:center; }
-  .sort-chip{ font-size:9px; font-weight:600; text-transform:none; letter-spacing:0; padding:1px 7px; border-radius:999px; border:1px solid var(--border); background:var(--surface); color:var(--text-faint); white-space:nowrap; }
-  .sort-chip:hover{ color:var(--accent); border-color:var(--accent); }
-  .sort-chip.on{ color:var(--accent); border-color:var(--accent); background:var(--accent-soft); }
+  /* ---- seller rows: same columns as before, table look with a border between every column (2026-11-02) ---- */
+  /* fixed minimums keep every row's columns aligned (each row is its own grid) and fit a 1280px laptop; extra width is shared out on bigger screens */
+  .row-head, .row{ grid-template-columns: minmax(120px,1.6fr) minmax(80px,1fr) minmax(80px,1fr) minmax(60px,.6fr) minmax(64px,.7fr) minmax(76px,.8fr) minmax(64px,.7fr) minmax(76px,.8fr) minmax(78px,.8fr) minmax(64px,.7fr) minmax(70px,.7fr) minmax(70px,.75fr) minmax(110px,1.25fr); gap:0; padding:0; }
+  .bucket-body{ overflow-x:auto; }
+  .layout{ grid-template-columns:200px 1fr; }
+  .row > div:nth-child(2), .row > div:nth-child(3){ line-height:1.3; }
+  .row .seller .sid{ overflow-wrap:anywhere; }
+  .row-head > div{ white-space:nowrap; }
+  .row > div:nth-child(n+5):nth-child(-n+11){ white-space:nowrap; }
+  .row > div:nth-child(4) .src-tag{ white-space:normal; text-align:center; line-height:1.3; padding:1px 4px; letter-spacing:0; font-size:9px; }
+  @media (max-width:1440px){ .row-head > div, .row > div{ padding-inline:5px; } .row{ font-size:11px; } .row .mono{ font-size:10.5px; } }
+  .row > div:nth-child(n+4) .rto-src{ margin-left:3px; }
+  .row-head > div, .row > div{ padding:8px 10px; align-self:stretch; display:flex; flex-direction:column; justify-content:center; min-width:0; }
+  .row-head > div + div, .row > div + div{ border-left:1px solid var(--border); }
+  .row-head > div:nth-child(n+4), .row > div:nth-child(n+4){ align-items:center; text-align:center; }
+  /* slightly stronger dividers between column groups: seller info | week 1 & 2 | RTO & last 7 days | TS */
+  .row-head > div:nth-child(5), .row > div:nth-child(5),
+  .row-head > div:nth-child(9), .row > div:nth-child(9),
+  .row-head > div:nth-child(12), .row > div:nth-child(12){ border-left:2px solid color-mix(in srgb, var(--text) 16%, var(--border)); }
+  .row-head{ background:var(--surface-2); border-bottom:2px solid var(--border); color:var(--text-muted); font-size:9.5px; font-weight:700; letter-spacing:.04em; }
+  .row-head > div{ padding-block:9px; }
   .row{ border-top:none; border-bottom:1px solid var(--border); font-size:11.5px; }
   .bucket-body .row:last-child{ border-bottom:none; }
-  .bucket-body .row:nth-child(odd){ background:color-mix(in srgb, var(--surface-2) 40%, transparent); }
+  .bucket-body .row:nth-child(odd){ background:color-mix(in srgb, var(--surface-2) 45%, transparent); }
   .bucket-body .row:hover{ background:var(--accent-soft); }
-  .row > div{ align-self:stretch; display:flex; flex-direction:column; justify-content:center; }
-  .row > div:nth-child(n+3){ align-items:center; text-align:center; }
-  .row-head > .mcol, .row > .mcol{ border-left:1px solid var(--border); }
-  .row-head > .mcol + div:not(.mcol), .row > .mcol + div:not(.mcol){ border-left:1px solid var(--border); }
-  .row .sname{ font-weight:650; font-size:12.5px; line-height:1.25; }
-  .row .smeta{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:3px; }
-  .row .smeta .sid{ font-size:9.5px; }
-  .row .smeta .src-tag{ font-size:8.5px; padding:1px 6px; border:1px solid var(--border); background:var(--surface); }
-  .row .gm-name{ font-weight:600; }
-  .row .gc-name{ font-size:10.5px; color:var(--text-faint); margin-top:2px; }
-  .mpair{ display:inline-grid; grid-template-columns:auto auto; column-gap:8px; row-gap:3px; align-items:center; text-align:left; }
-  .mpair .mk{ font-size:8.5px; font-weight:700; text-transform:uppercase; letter-spacing:.05em; color:var(--text-faint); text-align:right; }
-  .mpair .mv{ white-space:nowrap; }
+  .bucket-body .row.self-logged{ background:color-mix(in srgb, var(--done-bg) 55%, transparent); }
+  .row .seller{ font-size:12px; }
+  .row .seller .sid{ font-weight:400; margin-top:2px; }
   .sg-pill{ display:inline-block; font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; font-size:10.5px; font-weight:700; padding:1px 8px; border-radius:999px; border:1px solid transparent; }
   .sg-pill.g{ background:color-mix(in srgb, var(--up-fg) 14%, transparent); color:var(--up-fg); border-color:color-mix(in srgb, var(--up-fg) 35%, transparent); }
   .sg-pill.y{ background:color-mix(in srgb, #f59e0b 18%, transparent); color:var(--pending-fg); border-color:color-mix(in srgb, #f59e0b 40%, transparent); }
   .sg-pill.r{ background:color-mix(in srgb, var(--down-fg) 13%, transparent); color:var(--down-fg); border-color:color-mix(in srgb, var(--down-fg) 35%, transparent); }
   .sg-pill.n{ background:var(--surface-2); color:var(--text-muted); border-color:var(--border); font-weight:600; }
-  @media (max-width:980px){
-    .row{ grid-template-columns:1fr 1fr; padding:4px 4px; }
-    .row > div{ padding:6px 10px; }
-    .row > .seller, .row > div:last-child{ grid-column:1 / -1; }
-    .row > div:nth-child(n+3){ align-items:flex-start; text-align:left; }
-    .row > .mcol, .row > .mcol + div:not(.mcol){ border-left:none; }
-  }
+  @media (max-width:980px){ .row > div + div{ border-left:none !important; } }
 </style>
 </head>
 <body>
@@ -851,7 +844,7 @@ function queueTemplate(){
     <details class="caveat" id="caveatBox">
       <summary><b>How to read this</b> <span class="ts-meta">— click to open</span></summary>
       <div class="caveat-body">PNL% compares last completed week (W1) to the week before (W2) — the underlying reports don't expose the still-forming current week.
-      <b>S/GMV (last 7 days)</b> is Meta spend ÷ GMV over the last 7 full days; when L7D spend is ₹3,000 or more it is green at ≤20%, yellow at 20–40% and red above 40%.
+      <b>S/GMV L7D</b> is Meta spend ÷ GMV over the last 7 full days; when L7D spend is ₹3,000 or more it is green at ≤20%, yellow at 20–40% and red above 40%.
       RTO% for new_pnl-sourced sellers (marked <sup class="rto-src">FB</sup>) is taken from Facebook data as a proxy, since new_pnl doesn't expose RTO in bulk yet — it can read 0% for sellers with no real Facebook orders that week. TS Done/Pending is pulled from the real troubleshoot log. For Objective Hit, Potential, Breakeven Potential, and Bucket Health specifically, an auto-TS alone does NOT count as done — a manual TS is required from the GM; such accounts show as Pending with a note even if Hitesh Agarwal's auto-TS already ran.
       <b>Auto vs manual:</b> eligible sellers tagged <i>auto</i> in the auto-TS program (Metabase 9963) are <b>auto-eligible</b> (marked AUTO-ELIGIBLE) and are not counted as GM pending — except in the four buckets above, which stay manual. Once a seller becomes eligible in a week they stay eligible for the rest of that week, even if their spend later drops (marked <i>Earlier this week</i>). A seller taken off the roster mid-week stays under their last GM until Sunday if a TS was logged on them that week, so that TS still counts (marked <i>Removed from roster</i>); a removed seller whose TS is still pending is dropped and never counted as pending. The team is off on Sundays, so a seller who first becomes eligible on a Sunday is not counted that week (marked <i>Eligible from Sunday</i>); sellers eligible Monday–Saturday still count. A TS logged on a seller who isn't TS-eligible is never counted in compliance. <b>Auto compliance</b> = auto-eligible sellers with an auto TS ÷ auto-eligible. <b>Manual TS compliance</b> = manual-eligible sellers done ÷ manual-eligible. <b>Total compliance of GM</b> = (manual-eligible done + manual TS on auto-eligible sellers + manual TS on the GM's sellers that weren't eligible this week) ÷ manual-eligible. An auto TS on a non-eligible seller is never counted.
       <b>Zero GMV (Monday Task)</b> is a separate, independent track from the 5 PNL-based buckets above — a seller can appear there regardless of their regular bucket, since it's driven by a dedicated Monday task list, not weekly PNL. Only tasks <b>scheduled on this week's Monday</b> are included — tasks created later in the week are not part of it. Zero GMV sellers always need a <b>manual TS from the GM</b> (an auto TS alone doesn't count), and they're counted in the main totals as manual-eligible. Each Zero GMV seller is listed only in the Zero GMV section (not again in its PNL bucket), so the sections add up to the GM's pending count. <b>"TS logged" tick:</b> GMs can tick a pending seller once they've done the TS, as a note to themselves for the day. It's saved only on that device, doesn't change any count, and clears when the next refresh shows the TS in the log.
@@ -1014,35 +1007,32 @@ function rtoTrendHtml(oldV, newV){
 function rowHtml(s, inZg){
   const statusHtml = tsStatusHtml(s, false, inZg);
   const marked = isGmPending(s, inZg) && SELF_LOG[s.id];
-  const pair = (k1, v1, k2, v2)=> `<div class="mpair"><span class="mk">${k1}</span><span class="mv">${v1}</span><span class="mk">${k2}</span><span class="mv">${v2}</span></div>`;
   return `<div class="row${marked ? ' self-logged' : ''}" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
-    <div class="seller" data-label="Seller"><div class="sname">${escapeHtml(s.name)}</div><div class="smeta"><span class="sid">${escapeHtml(s.id)}</span><span class="src-tag">${escapeHtml(s.bestSource)}</span></div></div>
-    <div class="owner" data-label="GM · GC"><div class="gm-name">${escapeHtml(s.gm)}</div><div class="gc-name">${escapeHtml(s.gc||'GC not set')}</div></div>
-    <div class="mcol" data-label="Week 1">${pair("Spend", spendCellHtml(s.w1Spend), "PNL", pnlCellHtml(s.w1Pnl, s.w1Spend, s.w2Pnl))}</div>
-    <div class="mcol" data-label="Week 2">${pair("Spend", spendCellHtml(s.w2Spend), "PNL", pnlCellHtml(s.w2Pnl, s.w2Spend, s.w3Pnl))}</div>
-    <div class="mcol" data-label="RTO (W1)">${rtoTrendHtml(s.rtoW2, s.rtoW1)}${s.rtoSource==='facebook_proxy'?'<sup class="rto-src" title="RTO taken from Facebook data as a proxy — this seller\'s best source is new_pnl, which doesn\'t expose RTO in bulk yet">FB</sup>':''}</div>
-    <div class="mcol" data-label="Last 7 days">${pair("Spend", spendCellHtml(s.l7dMetaSpend), "S/GMV", sGmvHtml(s.sGmvL7d, s.l7dMetaSpend))}</div>
-    <div class="tscol" data-label="Last TS">${lastTsHtml(s)}</div>
-    <div class="tscol" data-label="TS Status">${statusHtml}${selfLogHtml(s, inZg)}</div>
+    <div class="seller" data-label="Seller">${escapeHtml(s.name)}<div class="sid">${escapeHtml(s.id)}</div></div>
+    <div data-label="GM" title="${escapeHtml(s.gm)}">${escapeHtml(s.gm)}</div>
+    <div data-label="GC" title="${escapeHtml(s.gc||'')}">${escapeHtml(s.gc||'—')}</div>
+    <div data-label="Source"><span class="src-tag">${escapeHtml(s.bestSource)}</span></div>
+    <div data-label="W1 Spend">${spendCellHtml(s.w1Spend)}</div>
+    <div data-label="W1 PNL">${pnlCellHtml(s.w1Pnl, s.w1Spend, s.w2Pnl)}</div>
+    <div data-label="W2 Spend">${spendCellHtml(s.w2Spend)}</div>
+    <div data-label="W2 PNL">${pnlCellHtml(s.w2Pnl, s.w2Spend, s.w3Pnl)}</div>
+    <div data-label="RTO (W1)">${rtoTrendHtml(s.rtoW2, s.rtoW1)}${s.rtoSource==='facebook_proxy'?'<sup class="rto-src" title="RTO taken from Facebook data as a proxy — this seller\'s best source is new_pnl, which doesn\'t expose RTO in bulk yet">FB</sup>':''}</div>
+    <div data-label="L7D Meta">${spendCellHtml(s.l7dMetaSpend)}</div>
+    <div data-label="S/GMV L7D">${sGmvHtml(s.sGmvL7d, s.l7dMetaSpend)}</div>
+    <div data-label="Last TS">${lastTsHtml(s)}</div>
+    <div data-label="TS Status">${statusHtml}${selfLogHtml(s, inZg)}</div>
   </div>`;
 }
 
-// Grouped header: one cell per column group, with a sort chip for each value stacked in that cell.
-const QUEUE_COLS = [
-  {label:"Seller", sorts:[["name","Seller"]]},
-  {label:"GM · GC", sorts:[["gm","GM"], ["gc","GC"]]},
-  {label:"Week 1", sorts:[["w1Spend","Spend"], ["w1Pnl","PNL"]], metric:true},
-  {label:"Week 2", sorts:[["w2Spend","Spend"], ["w2Pnl","PNL"]], metric:true},
-  {label:"RTO (W1)", sorts:[["rtoW1","RTO"]], metric:true},
-  {label:"Last 7 days", sorts:[["l7dMetaSpend","Spend"], ["sGmvL7d","S/GMV"]], metric:true, tip:"S/GMV = Meta spend ÷ GMV over the last 7 full days. Coloured only when L7D spend ≥ ₹3,000: ≤20% green, 20–40% yellow, >40% red."},
-  {label:"Last TS", sorts:[["lastTsDate","Date"]]},
-  {label:"TS Status", sorts:[["tsDone","Status"]]},
+const QUEUE_SORT_COLS = [
+  {key:"name", label:"Seller"}, {key:"gm", label:"GM"}, {key:"gc", label:"GC"}, {key:"bestSource", label:"Source"},
+  {key:"w1Spend", label:"W1 Spend"}, {key:"w1Pnl", label:"W1 PNL"}, {key:"w2Spend", label:"W2 Spend"}, {key:"w2Pnl", label:"W2 PNL"},
+  {key:"rtoW1", label:"RTO (W1)"}, {key:"l7dMetaSpend", label:"L7D Meta"}, {key:"sGmvL7d", label:"S/GMV L7D", tip:"Meta spend ÷ GMV over the last 7 full days. Coloured only when L7D spend ≥ ₹3,000: ≤20% green, 20–40% yellow, >40% red."}, {key:"lastTsDate", label:"Last TS"}, {key:"tsDone", label:"TS Status"},
 ];
 function queueRowHeadHtml(){
-  return `<div class="row-head">${QUEUE_COLS.map(c=>{
-    const chips = c.sorts.map(([k,l])=>`<span data-sort="${k}" class="sortable sort-chip${state.sort.field===k?' on':''}">${l}${sortArrow(k, state.sort)}</span>`).join("");
-    return `<div class="${c.metric?'mcol':''}"${c.tip?` title="${escapeHtml(c.tip)}"`:''}><div class="hd-group">${c.label}${c.tip?' <span class="hd-i">ⓘ</span>':''}</div><div class="hd-subs">${chips}</div></div>`;
-  }).join("")}</div>`;
+  return `<div class="row-head">${QUEUE_SORT_COLS.map(c=>
+    `<div data-sort="${c.key}" class="sortable"${c.tip?` title="${escapeHtml(c.tip)}"`:""}>${c.label}${c.tip?' <span class="hd-i">ⓘ</span>':""}${sortArrow(c.key, state.sort)}</div>`
+  ).join("")}</div>`;
 }
 
 function renderBuckets(){
