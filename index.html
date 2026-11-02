@@ -356,18 +356,29 @@
   @media (max-width:980px){ .row > div:nth-child(n+4){ text-align:left; } }
   @media (max-width:980px){ .stats{ grid-template-columns:repeat(2,1fr); } }
   .hd-i{ color:var(--accent); cursor:help; }
+  .copy-id{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; margin-left:3px; padding:0; border:1px solid transparent; border-radius:5px; background:none; color:var(--text-faint); vertical-align:middle; cursor:pointer; flex:none; }
+  .copy-id:hover{ color:var(--accent); border-color:var(--border); background:var(--surface); }
+  .copy-id:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .copy-id svg{ width:12px; height:12px; }
+  .copy-id .ic-ok{ display:none; }
+  .row .seller .sid{ display:flex; align-items:center; gap:3px; }
+  .row .seller .copy-id{ margin-left:0; }
+  .row .seller .sid-txt{ min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-size:9px; }
+  .copy-id.copied{ color:var(--up-fg); border-color:color-mix(in srgb, var(--up-fg) 40%, transparent); }
+  .copy-id.copied .ic-copy{ display:none; }
+  .copy-id.copied .ic-ok{ display:inline; }
+  .copy-id.copy-failed{ color:var(--down-fg); }
 
   /* ---- seller rows: same columns as before, table look with a border between every column (2026-11-02) ---- */
   /* fixed minimums keep every row's columns aligned (each row is its own grid) and fit a 1280px laptop; extra width is shared out on bigger screens */
-  .row-head, .row{ grid-template-columns: minmax(120px,1.6fr) minmax(80px,1fr) minmax(80px,1fr) minmax(60px,.6fr) minmax(64px,.7fr) minmax(76px,.8fr) minmax(64px,.7fr) minmax(76px,.8fr) minmax(78px,.8fr) minmax(64px,.7fr) minmax(70px,.7fr) minmax(70px,.75fr) minmax(110px,1.25fr); gap:0; padding:0; }
+  .row-head, .row{ grid-template-columns: minmax(150px,2.1fr) minmax(76px,1fr) minmax(80px,1fr) minmax(60px,.6fr) minmax(64px,.7fr) minmax(74px,.8fr) minmax(64px,.7fr) minmax(74px,.8fr) minmax(74px,.8fr) minmax(64px,.7fr) minmax(70px,.7fr) minmax(66px,.75fr) minmax(100px,1.25fr); gap:0; padding:0; }
   .bucket-body{ overflow-x:auto; }
-  .layout{ grid-template-columns:200px 1fr; }
+  .layout{ grid-template-columns:196px 1fr; }
   .row > div:nth-child(2), .row > div:nth-child(3){ line-height:1.3; }
   .row .seller .sid{ overflow-wrap:anywhere; }
   .row-head > div{ white-space:nowrap; }
   .row > div:nth-child(n+5):nth-child(-n+11){ white-space:nowrap; }
   .row > div:nth-child(4) .src-tag{ white-space:normal; text-align:center; line-height:1.3; padding:1px 4px; letter-spacing:0; font-size:9px; }
-  @media (max-width:1440px){ .row-head > div, .row > div{ padding-inline:5px; } .row{ font-size:11px; } .row .mono{ font-size:10.5px; } }
   .row > div:nth-child(n+4) .rto-src{ margin-left:3px; }
   .row-head > div, .row > div{ padding:8px 10px; align-self:stretch; display:flex; flex-direction:column; justify-content:center; min-width:0; }
   .row-head > div + div, .row > div + div{ border-left:1px solid var(--border); }
@@ -390,6 +401,7 @@
   .sg-pill.y{ background:color-mix(in srgb, #f59e0b 18%, transparent); color:var(--pending-fg); border-color:color-mix(in srgb, #f59e0b 40%, transparent); }
   .sg-pill.r{ background:color-mix(in srgb, var(--down-fg) 13%, transparent); color:var(--down-fg); border-color:color-mix(in srgb, var(--down-fg) 35%, transparent); }
   .sg-pill.n{ background:var(--surface-2); color:var(--text-muted); border-color:var(--border); font-weight:600; }
+  @media (max-width:1440px){ .row-head > div, .row > div{ padding-inline:5px; } .row{ font-size:11px; } .row .mono{ font-size:10.5px; } .row .seller .sid-txt{ font-size:8.5px; } }
   @media (max-width:980px){ .row > div + div{ border-left:none !important; } }
 </style>
 </head>
@@ -681,6 +693,33 @@ function renderShell(){
 // onSnapshot re-render landing between mousedown and mouseup silently drops
 // the click. Delegating to #appRoot (which itself is never replaced, only its
 // contents) makes every one of these interactive regardless of render timing.
+// Copy-seller-ID button (GMs copy IDs constantly). Capture phase so the click never also opens the seller popup.
+const COPY_ICONS = '<svg class="ic-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.6"/><path d="M10.5 3.5v-.5a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5"/></svg><svg class="ic-ok" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
+function copyIdBtn(id){ return `<button type="button" class="copy-id" data-copy-id="${escapeHtml(id)}" title="Copy seller ID" aria-label="Copy seller ID">${COPY_ICONS}</button>`; }
+async function copySellerId(btn){
+  const id = btn.dataset.copyId;
+  let ok = false;
+  try{ await navigator.clipboard.writeText(id); ok = true; }catch(e){}
+  if(!ok){
+    const ta = document.createElement("textarea");
+    ta.value = id; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    try{ ok = document.execCommand("copy"); }catch(e){}
+    ta.remove();
+  }
+  btn.classList.toggle("copied", ok); btn.classList.toggle("copy-failed", !ok);
+  btn.title = ok ? "Copied!" : "Copy is blocked here — select the ID and press Cmd+C";
+  clearTimeout(btn._t);
+  btn._t = setTimeout(()=>{ btn.classList.remove("copied", "copy-failed"); btn.title = "Copy seller ID"; }, 1400);
+}
+document.addEventListener("click", e=>{
+  const btn = e.target.closest("[data-copy-id]");
+  if(!btn) return;
+  e.preventDefault(); e.stopPropagation();
+  copySellerId(btn);
+}, true);
+document.addEventListener("keydown", e=>{ if((e.key==="Enter" || e.key===" ") && e.target.closest("[data-copy-id]")) e.stopPropagation(); }, true);
+
 document.getElementById("appRoot").addEventListener("click", e=>{
   const selfLogEl = e.target.closest(".self-log");
   if(selfLogEl){
@@ -1008,7 +1047,7 @@ function rowHtml(s, inZg){
   const statusHtml = tsStatusHtml(s, false, inZg);
   const marked = isGmPending(s, inZg) && SELF_LOG[s.id];
   return `<div class="row${marked ? ' self-logged' : ''}" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
-    <div class="seller" data-label="Seller">${escapeHtml(s.name)}<div class="sid">${escapeHtml(s.id)}</div></div>
+    <div class="seller" data-label="Seller">${escapeHtml(s.name)}<div class="sid"><span class="sid-txt" title="${escapeHtml(s.id)}">${escapeHtml(s.id)}</span>${copyIdBtn(s.id)}</div></div>
     <div data-label="GM" title="${escapeHtml(s.gm)}">${escapeHtml(s.gm)}</div>
     <div data-label="GC" title="${escapeHtml(s.gc||'')}">${escapeHtml(s.gc||'—')}</div>
     <div data-label="Source"><span class="src-tag">${escapeHtml(s.bestSource)}</span></div>
@@ -1104,7 +1143,7 @@ function openSellerDetail(id){
     <div class="panel" style="max-width:640px;">
       <h2>${escapeHtml(s.name)}</h2>
       <div class="detail-meta">
-        <span class="sid mono">${escapeHtml(s.id)}</span><span>·</span>
+        <span class="sid mono">${escapeHtml(s.id)}${copyIdBtn(s.id)}</span><span>·</span>
         <span>${escapeHtml(s.company||'')}</span>
       </div>
       <div class="detail-grid">
