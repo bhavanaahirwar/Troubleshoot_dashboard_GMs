@@ -124,7 +124,7 @@
   .bucket.collapsed .chev{ transform:rotate(-90deg); }
   .bucket.collapsed .bucket-body{ display:none; }
 
-  .row-head, .row{ display:grid; grid-template-columns: 1.5fr .9fr .8fr .8fr .8fr .9fr .8fr .9fr .9fr .9fr .8fr 1fr; gap:6px; padding:9px 16px; align-items:center; font-size:12px; }
+  .row-head, .row{ display:grid; grid-template-columns: 1.5fr .9fr .8fr .8fr .8fr .9fr .8fr .9fr .9fr .9fr .8fr .8fr 1fr; gap:6px; padding:9px 16px; align-items:center; font-size:12px; }
   .row-head{ background:var(--surface-2); color:var(--text-faint); font-size:10px; text-transform:uppercase; letter-spacing:.02em; font-weight:600; }
   .row-head .sortable, th.sortable{ cursor:pointer; user-select:none; }
   .row-head .sortable:hover, th.sortable:hover{ color:var(--accent); }
@@ -587,7 +587,7 @@ function flattenSnapshot(gmDocs){
   gmDocs.forEach(doc=>{
     const d = doc.data();
     if(!d) return;
-    gms.add(d.gm);
+    if(d.gm && d.gm !== "Unassigned") gms.add(d.gm);  // blank-GM roster rows are not a GM; they stay in "All GMs"
     (d.sellers||[]).forEach(s=> sellers.push(s));
     if(d.updatedAt && (!latest || d.updatedAt > latest)) latest = d.updatedAt;
   });
@@ -691,7 +691,7 @@ document.getElementById("appRoot").addEventListener("click", e=>{
       {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"company",label:"Company"},
       {key:"gm",label:"GM"}, {key:"gc",label:"GC"}, {key:"bestSource",label:"Source"},
       {key:"w1Spend",label:"W1 Spend"}, {key:"w1Pnl",label:"W1 PNL %"}, {key:"w2Spend",label:"W2 Spend"},
-      {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"}, {key:"l7dMetaSpend",label:"L7D Meta Spend"},
+      {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"}, {key:"l7dMetaSpend",label:"L7D Meta Spend"}, {key:"sGmvL7d",label:"S/GMV L7D %"},
       {key:"tsEligType",label:"TS Eligibility (auto/manual)"}, {key:"autoTag",label:"Tagged Auto"},
       {key:"tsDone",label:"TS Done"}, {key:"countedInCompliance",label:"Counted In Compliance"}, {key:"tsType",label:"TS Type"}, {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"}, {key:"lastTsDate",label:"Last TS Date (any week)"}, {key:"lastTsType",label:"Last TS Type"}, {key:"lastTsBy",label:"Last TS By"},
     ];
@@ -981,6 +981,7 @@ function rowHtml(s, inZg){
     <div data-label="W2 PNL">${pnlCellHtml(s.w2Pnl, s.w2Spend, s.w3Pnl)}</div>
     <div data-label="RTO (W1)">${rtoTrendHtml(s.rtoW2, s.rtoW1)}${s.rtoSource==='facebook_proxy'?'<sup class="rto-src" title="RTO taken from Facebook data as a proxy — this seller\'s best source is new_pnl, which doesn\'t expose RTO in bulk yet">FB</sup>':''}</div>
     <div data-label="L7D Meta">${spendCellHtml(s.l7dMetaSpend)}</div>
+    <div data-label="S/GMV L7D" class="mono">${sGmvHtml(s.sGmvL7d)}</div>
     <div data-label="Last TS">${lastTsHtml(s)}</div>
     <div data-label="TS Status">${statusHtml}${selfLogHtml(s, inZg)}</div>
   </div>`;
@@ -989,7 +990,7 @@ function rowHtml(s, inZg){
 const QUEUE_SORT_COLS = [
   {key:"name", label:"Seller"}, {key:"gm", label:"GM"}, {key:"gc", label:"GC"}, {key:"bestSource", label:"Source"},
   {key:"w1Spend", label:"W1 Spend"}, {key:"w1Pnl", label:"W1 PNL"}, {key:"w2Spend", label:"W2 Spend"}, {key:"w2Pnl", label:"W2 PNL"},
-  {key:"rtoW1", label:"RTO (W1)"}, {key:"l7dMetaSpend", label:"L7D Meta"}, {key:"lastTsDate", label:"Last TS"}, {key:"tsDone", label:"TS Status"},
+  {key:"rtoW1", label:"RTO (W1)"}, {key:"l7dMetaSpend", label:"L7D Meta"}, {key:"sGmvL7d", label:"S/GMV L7D"}, {key:"lastTsDate", label:"Last TS"}, {key:"tsDone", label:"TS Status"},
 ];
 function queueRowHeadHtml(){
   return `<div class="row-head">${QUEUE_SORT_COLS.map(c=>
@@ -1030,6 +1031,8 @@ document.body.appendChild(detailScrim);
 function closeDetail(){ detailScrim.hidden = true; detailScrim.innerHTML = ""; }
 detailScrim.addEventListener("click", e=>{ if(e.target===detailScrim) closeDetail(); });
 
+// S/GMV L7D: total Meta spend / total GMV over the last 7 complete days (card 10773); "—" when there was no GMV.
+function sGmvHtml(v){ return v==null ? '<span class="na">—</span>' : v.toFixed(1)+"%"; }
 function moneyOrDash(n){ return n==null ? "—" : fmtMoney(n); }
 function pctOrDash(n){ return n==null ? "—" : n.toFixed(1)+"%"; }
 
@@ -1074,6 +1077,7 @@ function openSellerDetail(id){
         <div><label>RTO W1${s.rtoSource==='facebook_proxy'?' <span class="ts-meta">(via Facebook proxy)</span>':''}</label><div class="mono">${s.rtoW1!=null?s.rtoW1.toFixed(2)+'%':'—'}</div></div>
         <div><label>RTO W2</label><div class="mono">${s.rtoW2!=null?s.rtoW2.toFixed(2)+'%':'—'}</div></div>
         <div><label>L7D Meta spend</label><div>${spendCellHtml(s.l7dMetaSpend)}</div></div>
+        <div><label>S/GMV L7D <span class="ts-meta">(Meta spend ÷ GMV, last 7 days)</span></label><div class="mono">${sGmvHtml(s.sGmvL7d)}</div></div>
         <div><label>Eligible via</label><div>${s.eligibleViaW1?'<span class="status-pill done">W1</span>':''} ${s.eligibleViaL7d?'<span class="status-pill done">L7D</span>':''}${(s.zeroGmv&&s.zeroGmv.isZeroGmv)?'<span class="status-pill" style="background:var(--b-zerogmv);color:#fff;">Zero GMV</span>':''}${s.eligibleEarlierThisWeek?'<span class="status-pill done" title="Was eligible earlier this week; stays eligible for the whole week">Earlier this week</span>':''}${s.removedFromRoster?'<span class="status-pill" style="background:#f59e0b;color:#fff;" title="Taken off the roster this week; kept under this GM until Sunday because a TS was logged this week">Removed from roster</span>':''}${s.eligibleFromSunday?'<span class="status-pill pending" title="Became eligible only on Sunday, when the team is off — not counted this week">Eligible from Sunday — not counted</span>':''}${(!s.eligibleViaW1&&!s.eligibleViaL7d&&!s.eligibleEarlierThisWeek&&!s.eligibleFromSunday&&!(s.zeroGmv&&s.zeroGmv.isZeroGmv))?'<span class="na">not eligible</span>':''}</div></div>
         ${(s.zeroGmv&&s.zeroGmv.isZeroGmv) ? `<div><label>Zero GMV task scheduled</label><div class="mono" style="font-size:12px;">${escapeHtml((s.zeroGmv.scheduledAt||'').replace('T',' ').slice(0,16))}</div></div>` : ''}
         <div><label>TS eligibility</label><div>${eligLabel(s)}</div></div>
@@ -1141,7 +1145,7 @@ function wireQueueTab(){
       {key:"gm",label:"GM"}, {key:"gc",label:"GC"}, {key:"bestSource",label:"Source"},
       {key:"bucket",label:"Bucket"}, {key:"w1Spend",label:"W1 Spend"}, {key:"w1Pnl",label:"W1 PNL %"},
       {key:"w2Spend",label:"W2 Spend"}, {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"},
-      {key:"l7dMetaSpend",label:"L7D Meta Spend"}, {key:"tsEligType",label:"TS Eligibility (auto/manual)"}, {key:"autoTag",label:"Tagged Auto"},
+      {key:"l7dMetaSpend",label:"L7D Meta Spend"}, {key:"sGmvL7d",label:"S/GMV L7D %"}, {key:"tsEligType",label:"TS Eligibility (auto/manual)"}, {key:"autoTag",label:"Tagged Auto"},
       {key:"tsDone",label:"TS Done"}, {key:"countedInCompliance",label:"Counted In Compliance"}, {key:"tsType",label:"TS Type"},
       {key:"tsBy",label:"TS By"}, {key:"tsDate",label:"TS Date"}, {key:"lastTsDate",label:"Last TS Date (any week)"}, {key:"lastTsType",label:"Last TS Type"}, {key:"lastTsBy",label:"Last TS By"},
     ];
