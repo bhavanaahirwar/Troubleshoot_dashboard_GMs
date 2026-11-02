@@ -351,9 +351,9 @@
   table.simple td.gm-total{ font-weight:700; background:color-mix(in srgb, var(--accent-soft) 60%, transparent); }
   table.movement th, table.movement td{ text-align:center; }
   table.movement th:nth-child(-n+2), table.movement td:nth-child(-n+2){ text-align:left; }
-  .row-head > div:nth-child(n+4), .row > div:nth-child(n+4){ text-align:center; }
+  .row-head > div:nth-child(n+5), .row > div:nth-child(n+5){ text-align:center; }
   .stat-tile{ text-align:center; }
-  @media (max-width:980px){ .row > div:nth-child(n+4){ text-align:left; } }
+  @media (max-width:980px){ .row > div:nth-child(n+5){ text-align:left; } }
   @media (max-width:980px){ .stats{ grid-template-columns:repeat(2,1fr); } }
   .hd-i{ color:var(--accent); cursor:help; }
   .copy-id{ display:inline-flex; align-items:center; justify-content:center; width:18px; height:18px; margin-left:3px; padding:0; border:1px solid transparent; border-radius:5px; background:none; color:var(--text-faint); vertical-align:middle; cursor:pointer; flex:none; }
@@ -371,22 +371,22 @@
 
   /* ---- seller rows: same columns as before, table look with a border between every column (2026-11-02) ---- */
   /* fixed minimums keep every row's columns aligned (each row is its own grid) and fit a 1280px laptop; extra width is shared out on bigger screens */
-  .row-head, .row{ grid-template-columns: minmax(150px,2.1fr) minmax(76px,1fr) minmax(80px,1fr) minmax(60px,.6fr) minmax(64px,.7fr) minmax(74px,.8fr) minmax(64px,.7fr) minmax(74px,.8fr) minmax(74px,.8fr) minmax(64px,.7fr) minmax(70px,.7fr) minmax(66px,.75fr) minmax(100px,1.25fr); gap:0; padding:0; }
+  .row-head, .row{ grid-template-columns: minmax(150px,2.1fr) minmax(128px,1.3fr) minmax(76px,1fr) minmax(80px,1fr) minmax(60px,.6fr) minmax(64px,.7fr) minmax(74px,.8fr) minmax(64px,.7fr) minmax(74px,.8fr) minmax(74px,.8fr) minmax(64px,.7fr) minmax(70px,.7fr) minmax(66px,.75fr) minmax(100px,1.25fr); gap:0; padding:0; }
   .bucket-body{ overflow-x:auto; }
   .layout{ grid-template-columns:196px 1fr; }
-  .row > div:nth-child(2), .row > div:nth-child(3){ line-height:1.3; }
+  .row > div:nth-child(3), .row > div:nth-child(4){ line-height:1.3; }
   .row .seller .sid{ overflow-wrap:anywhere; }
   .row-head > div{ white-space:nowrap; }
-  .row > div:nth-child(n+5):nth-child(-n+11){ white-space:nowrap; }
-  .row > div:nth-child(4) .src-tag{ white-space:normal; text-align:center; line-height:1.3; padding:1px 4px; letter-spacing:0; font-size:9px; }
-  .row > div:nth-child(n+4) .rto-src{ margin-left:3px; }
+  .row > div:nth-child(n+6):nth-child(-n+12){ white-space:nowrap; }
+  .row > div:nth-child(5) .src-tag{ white-space:normal; text-align:center; line-height:1.3; padding:1px 4px; letter-spacing:0; font-size:9px; }
+  .row > div:nth-child(n+5) .rto-src{ margin-left:3px; }
   .row-head > div, .row > div{ padding:8px 10px; align-self:stretch; display:flex; flex-direction:column; justify-content:center; min-width:0; }
   .row-head > div + div, .row > div + div{ border-left:1px solid var(--border); }
-  .row-head > div:nth-child(n+4), .row > div:nth-child(n+4){ align-items:center; text-align:center; }
+  .row-head > div:nth-child(n+5), .row > div:nth-child(n+5){ align-items:center; text-align:center; }
   /* slightly stronger dividers between column groups: seller info | week 1 & 2 | RTO & last 7 days | TS */
-  .row-head > div:nth-child(5), .row > div:nth-child(5),
-  .row-head > div:nth-child(9), .row > div:nth-child(9),
-  .row-head > div:nth-child(12), .row > div:nth-child(12){ border-left:2px solid color-mix(in srgb, var(--text) 16%, var(--border)); }
+  .row-head > div:nth-child(6), .row > div:nth-child(6),
+  .row-head > div:nth-child(10), .row > div:nth-child(10),
+  .row-head > div:nth-child(13), .row > div:nth-child(13){ border-left:2px solid color-mix(in srgb, var(--text) 16%, var(--border)); }
   .row-head{ background:var(--surface-2); border-bottom:2px solid var(--border); color:var(--text-muted); font-size:9.5px; font-weight:700; letter-spacing:.04em; }
   .row-head > div{ padding-block:9px; }
   .row{ border-top:none; border-bottom:1px solid var(--border); font-size:11.5px; }
@@ -401,7 +401,23 @@
   .sg-pill.y{ background:color-mix(in srgb, #f59e0b 18%, transparent); color:var(--pending-fg); border-color:color-mix(in srgb, #f59e0b 40%, transparent); }
   .sg-pill.r{ background:color-mix(in srgb, var(--down-fg) 13%, transparent); color:var(--down-fg); border-color:color-mix(in srgb, var(--down-fg) 35%, transparent); }
   .sg-pill.n{ background:var(--surface-2); color:var(--text-muted); border-color:var(--border); font-weight:600; }
-  @media (max-width:1440px){ .row-head > div, .row > div{ padding-inline:5px; } .row{ font-size:11px; } .row .mono{ font-size:10.5px; } .row .seller .sid-txt{ font-size:8.5px; } }
+  /* Meta ad account column (card 17443), with its own copy button */
+  .acct-cell{ display:flex; flex-direction:row !important; align-items:center; justify-content:flex-start !important; gap:3px; white-space:nowrap; }
+  .acct-cell .acct-txt{ font-family:"IBM Plex Mono",monospace; font-variant-numeric:tabular-nums; font-size:10.5px; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+  .acct-cell .copy-id{ margin-left:0; }
+  .detail-grid .acct-cell{ font-size:13px; }
+  .detail-grid .acct-cell .acct-txt{ font-size:12.5px; }
+  @media (max-width:1440px){ .row-head > div, .row > div{ padding-inline:5px; } .row{ font-size:11px; } .row .mono{ font-size:10.5px; } .row .seller .sid-txt{ font-size:8.5px; } .row .acct-txt{ font-size:9.5px; } }
+  /* narrow laptops (≤1366px): GC moves under the GM name so the Ad Account column fits without sideways scrolling */
+  .gc-sub, .gc-sub-h{ display:none; }
+  @media (min-width:981px) and (max-width:1366px){
+    .row-head, .row{ grid-template-columns: minmax(150px,2fr) minmax(124px,1.3fr) minmax(80px,1.1fr) minmax(60px,.6fr) minmax(56px,.7fr) minmax(70px,.8fr) minmax(56px,.7fr) minmax(70px,.8fr) minmax(66px,.8fr) minmax(56px,.7fr) minmax(66px,.75fr) minmax(64px,.75fr) minmax(95px,1.25fr); }
+    .row-head > div:nth-child(4), .row > div:nth-child(4){ display:none; }
+    .gc-sub{ display:block; font-size:9.5px; color:var(--text-faint); margin-top:2px; }
+    .gc-sub-h{ display:inline; }
+    .row-head > div, .row > div{ padding-inline:4px; }
+    .row .acct-txt{ font-size:9px; }
+  }
   @media (max-width:980px){ .row > div + div{ border-left:none !important; } }
 </style>
 </head>
@@ -469,6 +485,7 @@ function rowsToCsv(rows, cols){
   const lines = rows.map(r=> cols.map(c=>{
     let v = r[c.key];
     if(typeof v === "boolean") v = v ? "Yes" : "No";
+    if(c.text && v != null && v !== "") return csvEscape('="' + v + '"');
     return csvEscape(v);
   }).join(","));
   // leading BOM so Excel opens UTF-8 (₹ etc.) correctly instead of guessing the wrong encoding
@@ -695,7 +712,13 @@ function renderShell(){
 // contents) makes every one of these interactive regardless of render timing.
 // Copy-seller-ID button (GMs copy IDs constantly). Capture phase so the click never also opens the seller popup.
 const COPY_ICONS = '<svg class="ic-copy" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="5.5" y="5.5" width="8" height="8" rx="1.6"/><path d="M10.5 3.5v-.5a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 3v5A1.5 1.5 0 0 0 4 9.5h.5"/></svg><svg class="ic-ok" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7"/></svg>';
-function copyIdBtn(id){ return `<button type="button" class="copy-id" data-copy-id="${escapeHtml(id)}" title="Copy seller ID" aria-label="Copy seller ID">${COPY_ICONS}</button>`; }
+function copyIdBtn(id, what="seller ID"){ return `<button type="button" class="copy-id" data-copy-id="${escapeHtml(id)}" data-copy-title="Copy ${what}" title="Copy ${what}" aria-label="Copy ${what}">${COPY_ICONS}</button>`; }
+// Seller's current Meta ad account (card 17443: the linked account that spent most recently)
+function adAcctHtml(s){
+  if(!s.adAccountId) return '<span class="na" title="No Meta ad account linked">—</span>';
+  const tip = "Meta ad account " + s.adAccountId + (s.adAccountType ? " · " + s.adAccountType.replace(/_/g," ") : "");
+  return `<span class="acct-txt" title="${escapeHtml(tip)}">${escapeHtml(s.adAccountId)}</span>${copyIdBtn(s.adAccountId, "ad account ID")}`;
+}
 async function copySellerId(btn){
   const id = btn.dataset.copyId;
   let ok = false;
@@ -710,7 +733,7 @@ async function copySellerId(btn){
   btn.classList.toggle("copied", ok); btn.classList.toggle("copy-failed", !ok);
   btn.title = ok ? "Copied!" : "Copy is blocked here — select the ID and press Cmd+C";
   clearTimeout(btn._t);
-  btn._t = setTimeout(()=>{ btn.classList.remove("copied", "copy-failed"); btn.title = "Copy seller ID"; }, 1400);
+  btn._t = setTimeout(()=>{ btn.classList.remove("copied", "copy-failed"); btn.title = btn.dataset.copyTitle || "Copy seller ID"; }, 1400);
 }
 document.addEventListener("click", e=>{
   const btn = e.target.closest("[data-copy-id]");
@@ -763,7 +786,7 @@ document.getElementById("appRoot").addEventListener("click", e=>{
     const bkPred = bkMeta.isZeroGmv ? (s=>isZG(s)) : (s=>s.bucket===bk && !isZG(s));
     const rows = sortRows(SELLERS.filter(s=>passesFilter(s, !!bkMeta.isZeroGmv) && bkPred(s)), state.sort.field, state.sort.dir);
     const cols = [
-      {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"company",label:"Company"},
+      {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"adAccountId",label:"Meta Ad Account ID",text:true}, {key:"company",label:"Company"},
       {key:"gm",label:"GM"}, {key:"gc",label:"GC"}, {key:"bestSource",label:"Source"},
       {key:"w1Spend",label:"W1 Spend"}, {key:"w1Pnl",label:"W1 PNL %"}, {key:"w2Spend",label:"W2 Spend"},
       {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"}, {key:"l7dMetaSpend",label:"L7D Meta Spend"}, {key:"sGmvL7d",label:"S/GMV L7D %"},
@@ -905,7 +928,7 @@ function queueTemplate(){
         <button data-v="manual" class="${state.tsKind==='manual'?'active':''}">Manual (GM)</button>
         <button data-v="auto" class="${state.tsKind==='auto'?'active':''}">Auto</button>
       </div>
-      <input class="search" id="searchBox" type="text" placeholder="Search seller, ID, or company…" value="${escapeHtml(state.q)}">
+      <input class="search" id="searchBox" type="text" placeholder="Search seller, ID, ad account, or company…" value="${escapeHtml(state.q)}">
       <button class="btn-download" id="downloadQueueBtn" title="Download the currently filtered view as CSV">⬇ CSV</button>
     </div>
     <div class="layout">
@@ -924,7 +947,7 @@ function passesFilter(s, inZg){
   if(state.gc != null && (s.gc||"") !== state.gc) return false;
   if(state.q){
     const q = state.q.toLowerCase();
-    if(!(s.name.toLowerCase().includes(q) || (s.company||"").toLowerCase().includes(q) || s.id.toLowerCase().includes(q))) return false;
+    if(!(s.name.toLowerCase().includes(q) || (s.company||"").toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || (s.adAccountId||"").includes(q))) return false;
   }
   const isZeroGmv = s.zeroGmv && s.zeroGmv.isZeroGmv;
   if(state.scope==="eligible" && !s.eligible && !isZeroGmv) return false;
@@ -1048,7 +1071,8 @@ function rowHtml(s, inZg){
   const marked = isGmPending(s, inZg) && SELF_LOG[s.id];
   return `<div class="row${marked ? ' self-logged' : ''}" data-id="${escapeHtml(s.id)}" tabindex="0" role="button">
     <div class="seller" data-label="Seller">${escapeHtml(s.name)}<div class="sid"><span class="sid-txt" title="${escapeHtml(s.id)}">${escapeHtml(s.id)}</span>${copyIdBtn(s.id)}</div></div>
-    <div data-label="GM" title="${escapeHtml(s.gm)}">${escapeHtml(s.gm)}</div>
+    <div class="acct-cell" data-label="Ad Account">${adAcctHtml(s)}</div>
+    <div data-label="GM" title="${escapeHtml(s.gm)}">${escapeHtml(s.gm)}<span class="gc-sub" title="GC: ${escapeHtml(s.gc||'—')}">${escapeHtml(s.gc||'—')}</span></div>
     <div data-label="GC" title="${escapeHtml(s.gc||'')}">${escapeHtml(s.gc||'—')}</div>
     <div data-label="Source"><span class="src-tag">${escapeHtml(s.bestSource)}</span></div>
     <div data-label="W1 Spend">${spendCellHtml(s.w1Spend)}</div>
@@ -1064,13 +1088,13 @@ function rowHtml(s, inZg){
 }
 
 const QUEUE_SORT_COLS = [
-  {key:"name", label:"Seller"}, {key:"gm", label:"GM"}, {key:"gc", label:"GC"}, {key:"bestSource", label:"Source"},
+  {key:"name", label:"Seller"}, {key:"adAccountId", label:"Ad Account", tip:"Seller's current Meta ad account (the linked account that spent most recently). Use the icon to copy it."}, {key:"gm", label:"GM", extra:'<span class="gc-sub-h"> / GC</span>'}, {key:"gc", label:"GC"}, {key:"bestSource", label:"Source"},
   {key:"w1Spend", label:"W1 Spend"}, {key:"w1Pnl", label:"W1 PNL"}, {key:"w2Spend", label:"W2 Spend"}, {key:"w2Pnl", label:"W2 PNL"},
   {key:"rtoW1", label:"RTO (W1)"}, {key:"l7dMetaSpend", label:"L7D Meta"}, {key:"sGmvL7d", label:"S/GMV L7D", tip:"Meta spend ÷ GMV over the last 7 full days. Coloured only when L7D spend ≥ ₹3,000: ≤20% green, 20–40% yellow, >40% red."}, {key:"lastTsDate", label:"Last TS"}, {key:"tsDone", label:"TS Status"},
 ];
 function queueRowHeadHtml(){
   return `<div class="row-head">${QUEUE_SORT_COLS.map(c=>
-    `<div data-sort="${c.key}" class="sortable"${c.tip?` title="${escapeHtml(c.tip)}"`:""}>${c.label}${c.tip?' <span class="hd-i">ⓘ</span>':""}${sortArrow(c.key, state.sort)}</div>`
+    `<div data-sort="${c.key}" class="sortable"${c.tip?` title="${escapeHtml(c.tip)}"`:""}>${c.label}${c.extra||""}${c.tip?' <span class="hd-i">ⓘ</span>':""}${sortArrow(c.key, state.sort)}</div>`
   ).join("")}</div>`;
 }
 
@@ -1149,6 +1173,7 @@ function openSellerDetail(id){
       <div class="detail-grid">
         <div><label>GM</label><div>${escapeHtml(s.gm)}</div></div>
         <div><label>GC</label><div>${escapeHtml(s.gc||'—')}</div></div>
+        <div><label>Meta ad account</label><div class="acct-cell">${adAcctHtml(s)}</div></div>
         <div><label>Best source</label><div><span class="src-tag">${escapeHtml(s.bestSource)}</span></div></div>
         <div><label>Bucket</label><div>${bm?`<span class="status-pill" style="background:${bm.color};color:#fff;">${bm.label}</span>${bm.deadline?` <span class="ts-meta">${bm.deadline}</span>`:''}`:'<span class="na">none</span>'}</div></div>
         <div><label>W1 Spend</label><div>${spendCellHtml(s.w1Spend)}</div></div>
@@ -1223,7 +1248,7 @@ function wireQueueTab(){
   if(dlBtn) dlBtn.onclick = ()=>{
     const rows = SELLERS.filter(s=>passesFilter(s, false));
     const cols = [
-      {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"company",label:"Company"},
+      {key:"id",label:"Seller ID"}, {key:"name",label:"Seller Name"}, {key:"adAccountId",label:"Meta Ad Account ID",text:true}, {key:"company",label:"Company"},
       {key:"gm",label:"GM"}, {key:"gc",label:"GC"}, {key:"bestSource",label:"Source"},
       {key:"bucket",label:"Bucket"}, {key:"w1Spend",label:"W1 Spend"}, {key:"w1Pnl",label:"W1 PNL %"},
       {key:"w2Spend",label:"W2 Spend"}, {key:"w2Pnl",label:"W2 PNL %"}, {key:"rtoW1",label:"RTO W1 %"},
