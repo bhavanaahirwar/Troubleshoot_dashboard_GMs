@@ -556,7 +556,7 @@ let state = {
   collapsed: {},
   sort: { field: "w1Pnl", dir: "asc" },
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
-  bucketSort: { field: "gm", dir: "asc" }, trendSortBy: "current", trendMetric: "manual",
+  bucketSort: { field: "gm", dir: "asc" }, zgSort: { field: "rate", dir: "desc" }, trendSortBy: "current", trendMetric: "manual",
   moveWeek: null, moveGm: null, moveQ: "", moveRto: "all", moveSort: { field: "name", dir: "asc" },
 };
 
@@ -760,6 +760,8 @@ document.getElementById("appRoot").addEventListener("click", e=>{
 
   const bsortEl = e.target.closest("[data-bsort]");
   if(bsortEl){ toggleSort(state.bucketSort, bsortEl.dataset.bsort); renderCompliance(); return; }
+  const zsortEl = e.target.closest("[data-zsort]");
+  if(zsortEl){ toggleSort(state.zgSort, zsortEl.dataset.zsort); renderCompliance(); return; }
   const tpEl = e.target.closest("[data-tp]");
   if(tpEl){ const [wk, key] = tpEl.dataset.tp.split("|"); openTrendPoint(wk, key); return; }
   const tmEl = e.target.closest("[data-trend-metric]");
@@ -1556,11 +1558,11 @@ function renderCompliance(){
 }
 
 function renderZeroGmvComplianceCard(doc){
-  const rows = Object.values(doc.byGM||{})
+  const rows = sortRows(Object.values(doc.byGM||{})
     .filter(g=>g.zeroGmvEligible)
     .map(g=>({gm:g.gm, eligible:g.zeroGmvEligible||0, done:g.zeroGmvDone||0, doneManual:g.zeroGmvDoneManual||0, doneAuto:g.zeroGmvDoneAuto||0,
       pending:(g.zeroGmvEligible||0)-(g.zeroGmvDone||0), rate: g.zeroGmvEligible? Math.round((g.zeroGmvDone||0)/g.zeroGmvEligible*100):0}))
-    .sort((a,b)=> b.rate-a.rate || b.eligible-a.eligible);
+    .sort((a,b)=> b.rate-a.rate || b.eligible-a.eligible), state.zgSort.field, state.zgSort.dir);
   if(!rows.length){
     window._zeroGmvRowsForExport = [];
     return `<div class="card"><h2>Zero GMV Task Compliance</h2><div class="empty-state">No zero-GMV task data recorded for this week yet.</div></div>`;
@@ -1574,7 +1576,7 @@ function renderZeroGmvComplianceCard(doc){
   return `<div class="card">
     <h2 class="card-head-row">Zero GMV Task Compliance by GM <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— Monday-only mandatory task, W1 spend >₹1,000 with zero orders</span> <button class="btn-download-sm" data-download="zero-gmv-compliance" title="Download as CSV">⬇ CSV</button></h2>
     <table class="simple">
-      <thead><tr><th>GM</th><th>Eligible</th><th>Done</th><th>Manual</th><th>Auto</th><th>Pending</th><th>Compliance</th></tr></thead>
+      <thead><tr>${[["gm","GM"],["eligible","Eligible"],["done","Done"],["doneManual","Manual"],["doneAuto","Auto"],["pending","Pending"],["rate","Compliance"]].map(([k,l])=>`<th data-zsort="${k}" class="sortable">${l}${sortArrow(k, state.zgSort)}</th>`).join("")}</tr></thead>
       <tbody>
         <tr class="total-row"><td>All GMs (Overall)</td><td class="mono">${totalElig}</td><td class="mono">${totalDone}</td><td class="mono">${totalManual}</td><td class="mono">${totalAuto}</td><td class="mono">${totalElig-totalDone}</td><td><span class="rate-bar"><div style="width:${totalRate}%"></div></span>${totalRate}%</td></tr>
         ${rows.map(g=>`<tr><td>${escapeHtml(g.gm)}</td><td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td class="mono">${g.doneManual}</td><td class="mono">${g.doneAuto}</td><td class="mono">${g.pending}</td><td><span class="rate-bar"><div style="width:${g.rate}%"></div></span>${g.rate}%</td></tr>`).join("")}
