@@ -1452,7 +1452,7 @@ function renderTrendCard(){
   const sortBtn = (v, l)=> `<button class="${by === v ? "active" : ""}" data-trend-sort="${v}">${l}</button>`;
   const metricBtn = m=> `<button class="${metric === m ? "active" : ""}" data-trend-metric="${m}">${TREND_METRICS[m].label}</button>`;
   return `<div class="card">
-    <h2 class="card-head-row">${M.title} by GM — week by week</h2>
+    <h2 class="card-head-row">${M.title} by GM — week by week<a class="btn-download-sm" href="data/pending_ts.csv?v=${encodeURIComponent((COMPLIANCE_WEEKS[live]||{}).computedAt||"")}" download="pending_ts_by_week_and_gm.csv" title="Every GM-pending seller (seller id + name), week by week and GM by GM — the rows add up to the 'pending' numbers in this table">⬇ Pending sellers (CSV)</a></h2>
     <div class="trend-controls">
       <div class="seg">${metricBtn("manual")}${metricBtn("gm")}${metricBtn("zg")}</div>
       <div class="seg">${sortBtn("current", "Worst this week first")}${sortBtn("avg", "Worst average first")}${sortBtn("name", "By name")}</div>
@@ -1467,7 +1467,7 @@ function renderTrendCard(){
       ${rowHtml(total, "heat-total")}
       ${rows.map(r=> rowHtml(r)).join("")}
     </div></div>
-    <div class="ts-meta" style="margin-top:8px;">${M.note} Hover a tile to see all three metrics, or click it for the full numbers.${metric === "zg" ? "" : " Auto/manual tracking started in Week 40."}</div>
+    <div class="ts-meta" style="margin-top:8px;">${M.note} Hover a tile to see all three metrics, or click it for the full numbers. <b>Pending sellers (CSV)</b> lists every pending seller with seller id and name, week by week and GM by GM, with the reason it's pending and the last TS logged on it (filter zero_gmv = Yes for the Zero GMV view). Sellers who first became eligible on Sunday are not counted in any week.${metric === "zg" ? "" : " Auto/manual tracking started in Week 40."}</div>
   </div>`;
 }
 function openTrendPoint(wk, key){
