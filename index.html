@@ -188,10 +188,19 @@
   table.movement th, table.movement td{ padding:7px 10px; border-bottom:1px solid var(--border); white-space:nowrap; text-align:left; }
   table.movement th{ font-size:10px; text-transform:uppercase; color:var(--text-faint); font-weight:600; }
   table.movement .daycol{ text-align:center; }
-  table.cogs-table .wk-grp{ border-left:1px solid var(--border); }
+  table.cogs-table{ border-collapse:separate; border-spacing:0; border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  table.cogs-table th, table.cogs-table td{ text-align:center !important; vertical-align:middle; border-bottom:1px solid var(--border); border-right:1px solid var(--border); padding:9px 12px; }
+  table.cogs-table tr > :last-child{ border-right:none; }
+  table.cogs-table tbody tr:last-child td{ border-bottom:none; }
+  table.cogs-table thead th{ background:var(--surface-2); color:var(--text-muted); }
+  table.cogs-table thead tr:first-child th{ font-size:10.5px; letter-spacing:.03em; color:var(--text); }
+  table.cogs-table thead tr:first-child th.grp-blank{ background:var(--surface); }
+  table.cogs-table .wk-grp{ border-left:2px solid var(--border); }
+  table.cogs-table tbody tr:nth-child(even) td{ background:color-mix(in srgb, var(--surface-2) 45%, transparent); }
+  table.cogs-table tbody tr:hover td{ background:var(--surface-2); }
   table.cogs-table .cogs-off{ opacity:.45; }
   table.cogs-table .cogs-target{ font-weight:600; }
-  table.cogs-table .sid{ display:flex; align-items:center; gap:4px; }
+  table.cogs-table .sid{ display:flex; align-items:center; justify-content:center; gap:4px; }
 
   .change-item{ display:flex; justify-content:space-between; padding:8px 10px; border-bottom:1px solid var(--border); font-size:12.5px; }
   .change-item:last-child{ border-bottom:none; }
@@ -1915,13 +1924,13 @@ function renderCogsTable(){
   rows = sortRows(rows, state.cogsSort.field, state.cogsSort.dir, acc);
 
   const exportCols = [
-    {key:"id",label:"Seller ID"},{key:"name",label:"Seller Name"},{key:"company",label:"Company"},{key:"gm",label:"GM"},{key:"bestSource",label:"Source"},
+    {key:"id",label:"Seller ID"},{key:"name",label:"Seller Name"},{key:"company",label:"Company"},{key:"gm",label:"GM"},{key:"gc",label:"GC"},{key:"bestSource",label:"Source"},
     {key:"target",label:"Target"},{key:"rule",label:"Rule"},
   ];
   [1,2,3].forEach(i=>{ exportCols.push({key:`s${i}`,label:`W${i} Spend`},{key:`p${i}`,label:`W${i} PNL %`},{key:`a${i}`,label:`W${i} AOV`},{key:`t${i}`,label:`W${i} Target PNL %`},{key:`c${i}`,label:`W${i} COGS cut per order (₹)`}); });
   window._cogsColsForExport = exportCols;
   window._cogsRowsForExport = rows.map(s=>{
-    const r = {id:s.id, name:s.name, company:s.company||"", gm:s.gm, bestSource:s.bestSource, target:COGS_TARGET_META[s.cogs.target].label, rule:COGS_RULE_TEXT[s.cogs.rule]};
+    const r = {id:s.id, name:s.name, company:s.company||"", gm:s.gm, gc:s.gc||"", bestSource:s.bestSource, target:COGS_TARGET_META[s.cogs.target].label, rule:COGS_RULE_TEXT[s.cogs.rule]};
     [1,2,3].forEach(i=>{ const d = cogsWeekData(s,i);
       r[`s${i}`] = d.spend!=null ? Math.round(d.spend) : ""; r[`p${i}`] = d.pnl!=null ? d.pnl : "";
       r[`a${i}`] = d.plan && d.plan.aov!=null ? d.plan.aov : ""; r[`t${i}`] = d.plan ? d.plan.tgt : "";
@@ -1933,8 +1942,8 @@ function renderCogsTable(){
   const th = (key,label,cls="")=>`<th data-sort="${key}" class="sortable ${cls}">${label}${sortArrow(key, state.cogsSort)}</th>`;
   wrap.innerHTML = `<table class="movement cogs-table">
     <thead>
-      <tr><th colspan="4"></th>${[1,2,3].map(i=>`<th class="daycol wk-grp" colspan="4">${escapeHtml(cogsWeekLabel(i))}</th>`).join("")}</tr>
-      <tr>${th("name","Seller")}${th("gm","GM")}${th("bestSource","Source")}${th("target","Target")}
+      <tr><th colspan="5" class="grp-blank"></th>${[1,2,3].map(i=>`<th class="daycol wk-grp" colspan="4">${escapeHtml(cogsWeekLabel(i))}</th>`).join("")}</tr>
+      <tr>${th("name","Seller")}${th("gm","GM")}${th("gc","GC")}${th("bestSource","Source")}${th("target","Target")}
         ${[1,2,3].map(i=>`${th(`w${i}Spend`,"Spend","daycol wk-grp")}${th(`w${i}Pnl`,"PNL","daycol")}<th class="daycol">AOV</th>${th(`cut${i}`,"COGS cut / order","daycol")}`).join("")}</tr>
     </thead>
     <tbody>
@@ -1943,6 +1952,7 @@ function renderCogsTable(){
         return `<tr>
           <td>${escapeHtml(s.name)}<div class="sid">${escapeHtml(s.id)}${copyIdBtn(s.id)}</div></td>
           <td>${escapeHtml(s.gm)}</td>
+          <td>${s.gc ? escapeHtml(s.gc) : '<span class="na">—</span>'}</td>
           <td><span class="src-tag">${escapeHtml(s.bestSource)}</span></td>
           <td title="${escapeHtml(COGS_RULE_TEXT[s.cogs.rule])}"><span class="cogs-target">${tm.label}</span><div class="ts-meta">Rule ${escapeHtml(s.cogs.rule)}</div></td>
           ${[1,2,3].map(i=>{
