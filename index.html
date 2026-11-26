@@ -455,7 +455,7 @@
     <button class="theme-btn" id="ownerRtoBtn" title="RTO / PNL movement">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 15l4-4 3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
-    <button class="theme-btn" id="cogsBtn" title="COGS can be done" aria-label="COGS can be done">
+    <button class="theme-btn" id="cogsBtn" title="COGS suggestion" aria-label="COGS suggestion">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 19L15 9M6.5 9.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM13.5 18.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 5v9m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
     <button class="theme-btn" id="themeBtn" title="Toggle theme">
@@ -883,7 +883,7 @@ document.getElementById("appRoot").addEventListener("click", e=>{
       const cols = window._movementColsForExport || [];
       downloadCsv(`rto_pnl_movement_${state.moveWeek||"week"}.csv`, rows, cols);
     } else if(kind === "cogs"){
-      downloadCsv(`cogs_can_be_done.csv`, window._cogsRowsForExport || [], window._cogsColsForExport || []);
+      downloadCsv(`cogs_suggestion.csv`, window._cogsRowsForExport || [], window._cogsColsForExport || []);
     } else if(kind === "roster-changes"){
       const rows = window._rosterRowsForExport || [];
       downloadCsv(`roster_changes.csv`, rows, [
@@ -919,7 +919,7 @@ function openOwnerRto(){
   renderTab();
 }
 document.getElementById("ownerRtoBtn").onclick = openOwnerRto;
-// COGS can be done: opened from its header icon (or #cogs on the site URL), not the tab bar.
+// COGS suggestion: opened from its header icon (or #cogs on the site URL), not the tab bar.
 function openCogs(){
   document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("active"));
   state.tab = "cogs";
@@ -1841,14 +1841,14 @@ function wireMovementTab(){
   });
 }
 
-// ================= COGS CAN BE DONE (header icon, not in the tab bar) =================
+// ================= COGS SUGGESTION (header icon, not in the tab bar) =================
 // Built by the refresh (s.cogs): sellers whose COGS can be cut so the account reaches its target PNL. The first matching
 // rule decides the target; sellers already at target in their rule's weeks are not listed.
 // COGS cut per order for a week = AOV of that week (seller's 11011 best source) × (target − PNL%) / 100.
 const COGS_TARGET_META = {
-  objective: {label:"Objective hit", order:1},
-  missed: {label:"Missed hit", order:2},
-  subjective: {label:"Subjective hit", order:3},
+  objective: {label:"Can become objective hit", order:1},
+  missed: {label:"Can become missed hit", order:2},
+  subjective: {label:"Can become subjective hit", order:3},
 };
 const COGS_RULE_TEXT = {
   "1": "W1 & W2 spend ≥₹3k, PNL ≥−15% → both weeks to 5%",
@@ -1873,7 +1873,7 @@ function cogsWeekData(s, i){
 function cogsCutFor(s, i){ const p = (s.cogs.weeks||[]).find(x=>x.w===i); return p ? p.cut : null; }
 function cogsTemplate(){
   return `
-    <div class="controls owner-bar"><button class="btn-download" id="cogsBackBtn">← Back to dashboard</button><span class="ts-meta">COGS can be done · opened from the header icon</span></div>
+    <div class="controls owner-bar"><button class="btn-download" id="cogsBackBtn">← Back to dashboard</button><b>COGS suggestion</b><span class="ts-meta">opened from the header icon</span></div>
     <details class="caveat">
       <summary><b>How this works</b> <span class="ts-meta">— click to open</span></summary>
       <div class="caveat-body">Sellers whose COGS can be reduced so the account reaches the target PNL for the week. <b>COGS cut needed (₹ per order)</b> = AOV of that week × (target − PNL%) ÷ 100 — e.g. AOV ₹1,000 at −4% PNL needs ₹1,000 × (5 − (−4))% = ₹90 per order to reach 5%.
