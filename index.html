@@ -188,6 +188,10 @@
   table.movement th, table.movement td{ padding:7px 10px; border-bottom:1px solid var(--border); white-space:nowrap; text-align:left; }
   table.movement th{ font-size:10px; text-transform:uppercase; color:var(--text-faint); font-weight:600; }
   table.movement .daycol{ text-align:center; }
+  table.cogs-table .wk-grp{ border-left:1px solid var(--border); }
+  table.cogs-table .cogs-off{ opacity:.45; }
+  table.cogs-table .cogs-target{ font-weight:600; }
+  table.cogs-table .sid{ display:flex; align-items:center; gap:4px; }
 
   .change-item{ display:flex; justify-content:space-between; padding:8px 10px; border-bottom:1px solid var(--border); font-size:12.5px; }
   .change-item:last-child{ border-bottom:none; }
@@ -451,6 +455,9 @@
     <button class="theme-btn" id="ownerRtoBtn" title="RTO / PNL movement">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M4 19h16M6 15l4-4 3 3 5-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
     </button>
+    <button class="theme-btn" id="cogsBtn" title="COGS can be done" aria-label="COGS can be done">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 19L15 9M6.5 9.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4zM13.5 18.5a2 2 0 1 0 0-4 2 2 0 0 0 0 4z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M19 5v9m0 0l-3-3m3 3l3-3" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
     <button class="theme-btn" id="themeBtn" title="Toggle theme">
       <svg width="16" height="16" viewBox="0 0 24 24" fill="none" id="themeIcon"><circle cx="12" cy="12" r="4" stroke="currentColor" stroke-width="2"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
     </button>
@@ -572,6 +579,7 @@ let state = {
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
   bucketSort: { field: "gm", dir: "asc" }, zgSort: { field: "rate", dir: "desc" }, trendSortBy: "current", trendMetric: "manual",
   moveWeek: null, moveGm: null, moveQ: "", moveRto: "all", moveSort: { field: "name", dir: "asc" },
+  cogsGm: null, cogsQ: "", cogsTarget: "all", cogsSort: { field: "target", dir: "asc" },
 };
 
 function sortRows(rows, field, dir, accessor){
@@ -715,7 +723,9 @@ function renderShell(){
     pill.textContent = "Last updated: unknown";
   }
   updateTsUntilPill();
-  if(location.hash === "#rto" && state.tab !== "movement") openOwnerRto(); else renderTab();
+  if(location.hash === "#rto" && state.tab !== "movement") openOwnerRto();
+  else if(location.hash === "#cogs" && state.tab !== "cogs") openCogs();
+  else renderTab();
 }
 
 // Single delegated click handler on the stable #appRoot container. Rows, bucket
@@ -786,12 +796,13 @@ document.getElementById("appRoot").addEventListener("click", e=>{
   const sortEl = e.target.closest("[data-sort]");
   if(sortEl){
     const field = sortEl.dataset.sort;
-    const sortState = state.tab === "movement" ? state.moveSort : state.tab === "compliance" ? state.complianceSort : state.sort;
+    const sortState = state.tab === "movement" ? state.moveSort : state.tab === "cogs" ? state.cogsSort : state.tab === "compliance" ? state.complianceSort : state.sort;
     if(sortState.field === field) sortState.dir = sortState.dir === "asc" ? "desc" : "asc";
-    else { sortState.field = field; sortState.dir = field==="name" || field==="gm" ? "asc" : "desc"; }
+    else { sortState.field = field; sortState.dir = field==="name" || field==="gm" || field==="target" ? "asc" : "desc"; }
     if(state.tab==="queue") renderBuckets();
     else if(state.tab==="compliance") renderCompliance();
     else if(state.tab==="movement") renderMovementTable();
+    else if(state.tab==="cogs") renderCogsTable();
     return;
   }
 
@@ -871,6 +882,8 @@ document.getElementById("appRoot").addEventListener("click", e=>{
       const rows = window._movementRowsForExport || [];
       const cols = window._movementColsForExport || [];
       downloadCsv(`rto_pnl_movement_${state.moveWeek||"week"}.csv`, rows, cols);
+    } else if(kind === "cogs"){
+      downloadCsv(`cogs_can_be_done.csv`, window._cogsRowsForExport || [], window._cogsColsForExport || []);
     } else if(kind === "roster-changes"){
       const rows = window._rosterRowsForExport || [];
       downloadCsv(`roster_changes.csv`, rows, [
@@ -906,12 +919,20 @@ function openOwnerRto(){
   renderTab();
 }
 document.getElementById("ownerRtoBtn").onclick = openOwnerRto;
+// COGS can be done: opened from its header icon (or #cogs on the site URL), not the tab bar.
+function openCogs(){
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("active"));
+  state.tab = "cogs";
+  renderTab();
+}
+document.getElementById("cogsBtn").onclick = openCogs;
 
 function renderTab(){
   const root = document.getElementById("appRoot");
   if(state.tab==="queue") root.innerHTML = queueTemplate();
   else if(state.tab==="compliance") root.innerHTML = complianceTemplate();
   else if(state.tab==="movement") root.innerHTML = movementTemplate();
+  else if(state.tab==="cogs") root.innerHTML = cogsTemplate();
   else if(state.tab==="roster") root.innerHTML = rosterTemplate();
   wireTab();
 }
@@ -1820,6 +1841,146 @@ function wireMovementTab(){
   });
 }
 
+// ================= COGS CAN BE DONE (header icon, not in the tab bar) =================
+// Built by the refresh (s.cogs): sellers whose COGS can be cut so the account reaches its target PNL. The first matching
+// rule decides the target; sellers already at target in their rule's weeks are not listed.
+// COGS cut per order for a week = AOV of that week (seller's 11011 best source) × (target − PNL%) / 100.
+const COGS_TARGET_META = {
+  objective: {label:"Objective hit", order:1},
+  missed: {label:"Missed hit", order:2},
+  subjective: {label:"Subjective hit", order:3},
+};
+const COGS_RULE_TEXT = {
+  "1": "W1 & W2 spend ≥₹3k, PNL ≥−15% → both weeks to 5%",
+  "2": "W1 in loss; W2 & W3 spend ≥₹3k, PNL ≥−15% → W2 & W3 to 5%",
+  "3a": "W1 & W3 spend ≥₹3k, PNL ≥−15%, W2 spend <₹1k → W1 & W3 to 5%",
+  "3b": "W1 spend ≥₹3k, W2 spend ₹1k–3k, PNL ≥−15% → W1 to 5%, W2 to 3%",
+};
+function cogsWeeks(){
+  const wk = Object.keys(COMPLIANCE_WEEKS).sort().pop();
+  return (wk && COMPLIANCE_WEEKS[wk].cogsWeeks) || [];
+}
+function cogsWeekLabel(i){
+  const w = cogsWeeks().find(x=>x.w===i);
+  return w ? `W${i} · ${fmtDateLabel(w.from)}–${fmtDateLabel(w.to)}` : `W${i}`;
+}
+function cogsWeekData(s, i){
+  const spend = i===1 ? s.w1Spend : i===2 ? s.w2Spend : s.w3Spend;
+  const pnl = i===1 ? s.w1Pnl : i===2 ? s.w2Pnl : s.w3Pnl;
+  const plan = (s.cogs.weeks||[]).find(x=>x.w===i) || null;
+  return {spend, pnl, plan};
+}
+function cogsCutFor(s, i){ const p = (s.cogs.weeks||[]).find(x=>x.w===i); return p ? p.cut : null; }
+function cogsTemplate(){
+  return `
+    <div class="controls owner-bar"><button class="btn-download" id="cogsBackBtn">← Back to dashboard</button><span class="ts-meta">COGS can be done · opened from the header icon</span></div>
+    <details class="caveat">
+      <summary><b>How this works</b> <span class="ts-meta">— click to open</span></summary>
+      <div class="caveat-body">Sellers whose COGS can be reduced so the account reaches the target PNL for the week. <b>COGS cut needed (₹ per order)</b> = AOV of that week × (target − PNL%) ÷ 100 — e.g. AOV ₹1,000 at −4% PNL needs ₹1,000 × (5 − (−4))% = ₹90 per order to reach 5%.
+      Each seller is checked in this order and placed in the first rule that fits: <b>Objective hit</b> — ${COGS_RULE_TEXT["1"]}. <b>Missed hit</b> — ${COGS_RULE_TEXT["2"]}. <b>Subjective hit</b> — ${COGS_RULE_TEXT["3a"]}; or ${COGS_RULE_TEXT["3b"]}.
+      Sellers already at the target in every week of their rule are not listed. Spend and PNL are from the best-P&L source (Metabase 11011); a PNL of exactly 0% means the source has no P&L for that week and doesn't qualify.
+      AOV comes from the same source: GC View 3 (1880), Facebook (7643), Google (7644); for new_pnl (the 523 Meta P&L) it's taken from 7643, which matches the 523 card's AOV. "—" means the source has no delivered orders that week, so no AOV. Only sellers currently on the roster are shown.</div>
+    </details>
+    <div class="controls">
+      <select class="field" id="cogsGmSel"><option value="">All GMs</option>${GM_LIST.map(g=>`<option value="${escapeHtml(g)}" ${state.cogsGm===g?'selected':''}>${escapeHtml(g)}</option>`).join("")}</select>
+      <div class="seg" id="cogsTargetSeg"></div>
+      <input class="search" id="cogsSearch" type="text" placeholder="Search seller name or ID…" value="${escapeHtml(state.cogsQ)}">
+      <button class="btn-download" data-download="cogs" title="Download the current view as CSV">⬇ CSV</button>
+    </div>
+    <div class="card movement-grid-wrap"><div id="cogsTableWrap"></div></div>
+  `;
+}
+function renderCogsTable(){
+  const wrap = document.getElementById("cogsTableWrap");
+  if(!wrap) return;
+  let base = SELLERS.filter(s=> s.cogs && !s.removedFromRoster);
+  if(state.cogsGm) base = base.filter(s=>s.gm===state.cogsGm);
+  if(state.cogsQ){
+    const q = state.cogsQ.toLowerCase();
+    base = base.filter(s=> s.name.toLowerCase().includes(q) || s.id.toLowerCase().includes(q) || (s.company||"").toLowerCase().includes(q));
+  }
+  const seg = document.getElementById("cogsTargetSeg");
+  if(seg){
+    const n = t=> base.filter(s=>s.cogs.target===t).length;
+    seg.innerHTML = [["all","All",base.length], ...Object.entries(COGS_TARGET_META).map(([k,m])=>[k,m.label,n(k)])]
+      .map(([v,l,c])=>`<button data-v="${v}" class="${state.cogsTarget===v?'active':''}">${l} (${c})</button>`).join("");
+  }
+  let rows = state.cogsTarget==="all" ? base : base.filter(s=>s.cogs.target===state.cogsTarget);
+  const acc = (s,f)=>{
+    if(f==="target") return COGS_TARGET_META[s.cogs.target].order * 10 + (s.cogs.rule==="3b" ? 1 : 0);
+    if(f==="cut1"||f==="cut2"||f==="cut3") return cogsCutFor(s, +f.slice(3));
+    if(f==="w3Pnl") return s.w3Pnl;
+    return s[f];
+  };
+  rows = sortRows(rows, state.cogsSort.field, state.cogsSort.dir, acc);
+
+  const exportCols = [
+    {key:"id",label:"Seller ID"},{key:"name",label:"Seller Name"},{key:"company",label:"Company"},{key:"gm",label:"GM"},{key:"bestSource",label:"Source"},
+    {key:"target",label:"Target"},{key:"rule",label:"Rule"},
+  ];
+  [1,2,3].forEach(i=>{ exportCols.push({key:`s${i}`,label:`W${i} Spend`},{key:`p${i}`,label:`W${i} PNL %`},{key:`a${i}`,label:`W${i} AOV`},{key:`t${i}`,label:`W${i} Target PNL %`},{key:`c${i}`,label:`W${i} COGS cut per order (₹)`}); });
+  window._cogsColsForExport = exportCols;
+  window._cogsRowsForExport = rows.map(s=>{
+    const r = {id:s.id, name:s.name, company:s.company||"", gm:s.gm, bestSource:s.bestSource, target:COGS_TARGET_META[s.cogs.target].label, rule:COGS_RULE_TEXT[s.cogs.rule]};
+    [1,2,3].forEach(i=>{ const d = cogsWeekData(s,i);
+      r[`s${i}`] = d.spend!=null ? Math.round(d.spend) : ""; r[`p${i}`] = d.pnl!=null ? d.pnl : "";
+      r[`a${i}`] = d.plan && d.plan.aov!=null ? d.plan.aov : ""; r[`t${i}`] = d.plan ? d.plan.tgt : "";
+      r[`c${i}`] = d.plan ? (d.plan.cut==null ? "no AOV" : d.plan.cut) : ""; });
+    return r;
+  });
+
+  if(!rows.length){ wrap.innerHTML = `<div class="empty-bucket">No sellers match this filter.</div>`; return; }
+  const th = (key,label,cls="")=>`<th data-sort="${key}" class="sortable ${cls}">${label}${sortArrow(key, state.cogsSort)}</th>`;
+  wrap.innerHTML = `<table class="movement cogs-table">
+    <thead>
+      <tr><th colspan="4"></th>${[1,2,3].map(i=>`<th class="daycol wk-grp" colspan="4">${escapeHtml(cogsWeekLabel(i))}</th>`).join("")}</tr>
+      <tr>${th("name","Seller")}${th("gm","GM")}${th("bestSource","Source")}${th("target","Target")}
+        ${[1,2,3].map(i=>`${th(`w${i}Spend`,"Spend","daycol wk-grp")}${th(`w${i}Pnl`,"PNL","daycol")}<th class="daycol">AOV</th>${th(`cut${i}`,"COGS cut / order","daycol")}`).join("")}</tr>
+    </thead>
+    <tbody>
+      ${rows.map(s=>{
+        const tm = COGS_TARGET_META[s.cogs.target];
+        return `<tr>
+          <td>${escapeHtml(s.name)}<div class="sid">${escapeHtml(s.id)}${copyIdBtn(s.id)}</div></td>
+          <td>${escapeHtml(s.gm)}</td>
+          <td><span class="src-tag">${escapeHtml(s.bestSource)}</span></td>
+          <td title="${escapeHtml(COGS_RULE_TEXT[s.cogs.rule])}"><span class="cogs-target">${tm.label}</span><div class="ts-meta">Rule ${escapeHtml(s.cogs.rule)}</div></td>
+          ${[1,2,3].map(i=>{
+            const d = cogsWeekData(s,i);
+            const dim = d.plan ? "" : " cogs-off";
+            const pnl = d.pnl!=null && d.pnl!==0 ? `<span class="${pnlColorClass(d.pnl, d.spend)}">${d.pnl.toFixed(1)}%</span>` : '<span class="na">—</span>';
+            let aov = '<span class="na">·</span>', cut = '<span class="na">·</span>';
+            if(d.plan){
+              aov = d.plan.aov!=null ? `<span class="mono">${fmtMoney(d.plan.aov)}</span>` : '<span class="na" title="No delivered orders in the source that week">—</span>';
+              cut = d.plan.cut==null ? '<span class="na" title="No AOV for this week">no AOV</span>'
+                  : d.plan.cut===0 ? `<span class="clr-green" title="Already ≥${d.plan.tgt}%">✓ ≥${d.plan.tgt}%</span>`
+                  : `<b class="mono">₹${d.plan.cut.toLocaleString("en-IN",{maximumFractionDigits:0})}</b><div class="ts-meta">to ${d.plan.tgt}%</div>`;
+            }
+            return `<td class="daycol mono wk-grp${dim}">${d.spend!=null ? fmtMoney(d.spend) : "—"}</td><td class="daycol mono${dim}">${pnl}</td><td class="daycol${dim}">${aov}</td><td class="daycol${dim}">${cut}</td>`;
+          }).join("")}
+        </tr>`;
+      }).join("")}
+    </tbody>
+  </table>`;
+}
+function wireCogsTab(){
+  renderCogsTable();
+  const back = document.getElementById("cogsBackBtn");
+  if(back) back.onclick = ()=>{
+    state.tab = "queue";
+    document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("active", x.dataset.t==="queue"));
+    try{ if(location.hash === "#cogs") history.replaceState(null, "", location.pathname + location.search); }catch(e){}
+    renderTab();
+  };
+  const g = document.getElementById("cogsGmSel"); if(g) g.onchange = e=>{ state.cogsGm = e.target.value || null; renderCogsTable(); };
+  const q = document.getElementById("cogsSearch"); if(q) q.oninput = e=>{ state.cogsQ = e.target.value; renderCogsTable(); };
+  const seg = document.getElementById("cogsTargetSeg"); if(seg) seg.addEventListener("click", e=>{
+    const b = e.target.closest("button"); if(!b) return;
+    state.cogsTarget = b.dataset.v;
+    renderCogsTable();
+  });
+}
+
 // ================= ROSTER CHANGES TAB =================
 function rosterTemplate(){
   return `<div id="rosterBody"></div>`;
@@ -1877,6 +2038,7 @@ function wireTab(){
   if(state.tab==="queue") wireQueueTab();
   else if(state.tab==="compliance") wireComplianceTab();
   else if(state.tab==="movement") wireMovementTab();
+  else if(state.tab==="cogs") wireCogsTab();
   else if(state.tab==="roster") renderRoster();
 }
 
