@@ -1340,7 +1340,7 @@ function complianceRowFromGm(g){
 function complianceRowHtml(g, cls){
   return `<tr${cls?` class="${cls}"`:''}><td>${escapeHtml(g.gm)}</td>
     <td class="mono">${g.eligible}</td><td class="mono">${g.done}</td><td>${rateCell(g.rate)}</td>
-    <td class="grp-sep">${numCell(g.manualEligible)}</td><td class="gm-total">${numCell(g.gmDone)}</td><td>${numCell(g.manualDone)}</td><td>${numCell(g.manualOnAuto)}</td><td>${numCell(g.manualOnNotElig)}</td>
+    <td class="grp-sep">${numCell(g.manualEligible)}</td><td class="gm-total">${numCell(g.gmDone)}</td><td>${numCell(g.manualDone)}</td><td>${numCell(g.manualOnAuto)}</td><td${g.manualOnRemoved!=null?` title="${g.manualOnNotEligibleOwn||0} own-bucket sellers not eligible + ${g.manualOnRemoved} removed from roster this week + ${g.manualOnOtherBucket||0} outside their bucket (TS logged by this GM)"`:''}>${numCell(g.manualOnNotElig)}</td>
     <td>${rateCell(g.manualRate)}</td><td>${rateCell(g.gmRate)}</td><td>${pendCell(g.gmPending)}</td>
     <td class="grp-sep">${numCell(g.autoEligible)}</td><td>${numCell(g.autoDone)}</td><td>${rateCell(g.autoRate)}</td></tr>`;
 }
@@ -1548,7 +1548,8 @@ function renderCompliance(){
   const totalRow = complianceRowFromGm({gm:"All GMs (Overall)", eligible: doc.totalEligible, done: doc.totalDone,
     autoEligible: sumOr("totalAutoEligible","autoEligible"), autoDone: sumOr("totalAutoDone","autoDone"),
     manualEligible: sumOr("totalManualEligible","manualEligible"), manualDone: sumOr("totalManualDone","manualDone"),
-    manualOnAuto: sumOr("totalManualOnAuto","manualOnAuto"), manualOnNotEligible: sumOr("totalManualOnNotEligible","manualOnNotElig")});
+    manualOnAuto: sumOr("totalManualOnAuto","manualOnAuto"), manualOnNotEligible: sumOr("totalManualOnNotEligible","manualOnNotElig"),
+    manualOnNotEligibleOwn: doc.totalManualOnNotEligibleOwn, manualOnRemoved: doc.totalManualOnRemoved, manualOnOtherBucket: doc.totalManualOnOtherBucket});
   const tileRate = r=> r==null ? "—" : r+"%";
 
   // live bucket breakdown by GM (from current SELLERS, not the frozen weekly doc)
