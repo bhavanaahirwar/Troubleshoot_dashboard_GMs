@@ -27,6 +27,7 @@
     --b-objective:#7c3aed; --b-potential:#059669; --b-breakeven:#0d9488; --b-health:#2563eb; --b-pending:#dc2626; --b-zerogmv:#c2410c;
     --shadow: 0 1px 2px rgba(20,22,30,.04), 0 8px 24px rgba(20,22,30,.06);
     --tr-c1:#2a78d6; --tr-c2:#eb6834; --tr-c3:#1baf7a; --tr-c4:#a3a9b8;
+    --wl-b1:#104281; --wl-b2:#2a78d6; --wl-b3:#86b6ef;
     --radius:14px;
     color-scheme: light;
   }
@@ -43,6 +44,7 @@
       --b-objective:#a78bfa; --b-potential:#34d399; --b-breakeven:#2dd4bf; --b-health:#5b8cff; --b-pending:#f0554f; --b-zerogmv:#fb923c;
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
     --tr-c1:#3987e5; --tr-c2:#d95926; --tr-c3:#199e70; --tr-c4:#5d6476;
+    --wl-b1:#b7d3f6; --wl-b2:#5598e7; --wl-b3:#1c5cab;
       color-scheme: dark;
     }
   }
@@ -58,6 +60,7 @@
     --b-objective:#a78bfa; --b-potential:#34d399; --b-breakeven:#2dd4bf; --b-health:#5b8cff; --b-pending:#f0554f; --b-zerogmv:#fb923c;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
     --tr-c1:#3987e5; --tr-c2:#d95926; --tr-c3:#199e70; --tr-c4:#5d6476;
+    --wl-b1:#b7d3f6; --wl-b2:#5598e7; --wl-b3:#1c5cab;
     color-scheme: dark;
   }
   *{box-sizing:border-box;}
@@ -625,7 +628,7 @@ let state = {
   collapsed: {},
   sort: { field: "w1Pnl", dir: "asc" },
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
-  trView: "day", trGm: "__all__", trRange: 14, trSel: null, trSort: { field: "elig", dir: "desc" },
+  trView: "day", trGm: "__all__", wlMetric: "manual", wlWeek: null, trRange: 14, trSel: null, trSort: { field: "elig", dir: "desc" },
   bucketSort: { field: "gm", dir: "asc" }, zgSort: { field: "rate", dir: "desc" }, trendSortBy: "current", trendMetric: "manual",
   moveWeek: null, moveGm: null, moveQ: "", moveRto: "all", moveSort: { field: "name", dir: "asc" },
   cogsGm: null, cogsQ: "", cogsTarget: "all", cogsSort: { field: "target", dir: "asc" },
@@ -839,6 +842,10 @@ document.getElementById("appRoot").addEventListener("click", e=>{
   if(tpEl){ const [wk, key] = tpEl.dataset.tp.split("|"); openTrendPoint(wk, key); return; }
   const tmEl = e.target.closest("[data-trend-metric]");
   if(tmEl){ state.trendMetric = tmEl.dataset.trendMetric; renderCompliance(); return; }
+  const wlwEl = e.target.closest("[data-wlwk]");
+  if(wlwEl){ state.wlWeek = wlwEl.dataset.wlwk; renderCompliance(); return; }
+  const wlmEl = e.target.closest("[data-wlmetric]");
+  if(wlmEl){ state.wlMetric = wlmEl.dataset.wlmetric; renderCompliance(); return; }
   const trvEl = e.target.closest("[data-trview]");
   if(trvEl){ state.trView = trvEl.dataset.trview; state.trSel = null; renderCompliance(); return; }
   const trrEl = e.target.closest("[data-trrange]");
@@ -929,7 +936,7 @@ document.getElementById("appRoot").addEventListener("click", e=>{
       downloadCsv(`ts_by_gm_${x.period}.csv`, x.rows.map(r=> ({...r, mE: r.c[0], mA: r.c[1]})), [
         {key:"gm",label:"GM"},{key:"em",label:"Eligible - manual"},{key:"ea",label:"Eligible - auto"},{key:"elig",label:"Eligible - total"},
         {key:"mE",label:"Manual TS on manual-eligible"},{key:"mA",label:"Manual TS on auto-eligible"},{key:"onElig",label:"Manual TS - out of eligible"},
-        {key:"apart",label:"Manual TS - apart from eligible"},{key:"man",label:"Manual TS - total"},{key:"auto",label:"Went to auto TS"},
+        {key:"apart",label:"Manual TS - apart from eligible"},{key:"man",label:"Manual TS - total"},{key:"auto",label:"Auto TS logged"},
         {key:"mrate",label:"Manual TS compliance %"},{key:"rate",label:"Total compliance %"},
       ]);
     } else if(kind === "zero-gmv-compliance"){
@@ -1595,7 +1602,7 @@ const TR_CATS = [
   {i:0, label:"Manual TS · manual-eligible", cls:"tr-c1", v:"var(--tr-c1)"},
   {i:1, label:"Manual TS · auto-eligible", cls:"tr-c2", v:"var(--tr-c2)"},
   {i:2, label:"Manual TS · not eligible / other bucket", cls:"tr-c3", v:"var(--tr-c3)"},
-  {i:3, label:"Went to auto TS (eligible, no manual TS)", cls:"tr-c4", v:"var(--tr-c4)"},
+  {i:3, label:"Auto TS logged", cls:"tr-c4", v:"var(--tr-c4)"},
 ];
 const TR_DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const TR_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -1757,7 +1764,7 @@ function trTable(p, gms){
   const rows = sortRows(gms.map(row).filter(r=> r.elig || r.man || r.auto), state.trSort.field, state.trSort.dir);
   const tot = row({key: "__all__", gm: "All GMs"});
   const mix = r=>{ const t = r.c.reduce((a,b)=> a+b, 0); return t ? `<div class="tr-mix">${TR_CATS.map(k=> r.c[k.i] ? `<div class="${k.cls}" style="flex:${r.c[k.i]}"></div>` : "").join("")}</div>` : `<span style="color:var(--text-faint)">—</span>`; };
-  const cols = [["gm","GM"],["em","Eligible · manual"],["ea","Eligible · auto"],["elig","Eligible · total"],["onElig","Manual TS · out of eligible"],["apart","Manual TS · apart from eligible"],["man","Manual TS · total"],["auto","Went to auto TS"]]
+  const cols = [["gm","GM"],["em","Eligible · manual"],["ea","Eligible · auto"],["elig","Eligible · total"],["onElig","Manual TS · out of eligible"],["apart","Manual TS · apart from eligible"],["man","Manual TS · total"],["auto","Auto TS logged"]]
     .concat(wk ? [["mrate","Manual TS compliance"],["rate","Total compliance"]] : []);
   const td = (r)=> `<td>${escapeHtml(r.gm)}</td><td>${r.em}</td><td>${r.ea}</td><td>${r.elig}</td><td>${r.onElig}</td><td>${r.apart}</td><td><b>${r.man}</b></td><td>${r.auto}</td>${wk ? `<td>${r.mrate == null ? "—" : r.mrate + "%"}</td><td>${r.rate == null ? "—" : r.rate + "%"}</td>` : ""}<td>${mix(r)}</td>`;
   window._trRowsForExport = {period: p, rows: [tot, ...rows]};
@@ -1765,6 +1772,134 @@ function trTable(p, gms){
     <thead><tr>${cols.map(([k,l])=> `<th data-trsort="${k}">${l}${sortArrow(k, state.trSort)}</th>`).join("")}<th style="cursor:default">Mix</th></tr></thead>
     <tbody><tr class="all">${td(tot)}</tr>${rows.map(r=> `<tr>${td(r)}</tr>`).join("")}</tbody></table></div>`;
 }
+// ---- GM workload vs compliance: does a GM with more GCs / more eligible sellers reach lower compliance?
+// Size band = distinct GCs under the GM that week (data/ts_trends.json gmSize); eligible = manual-eligible sellers.
+const WL_BANDS = [
+  {key: "l", label: "4+ GCs", test: n=> n >= 4, v: "var(--wl-b1)"},
+  {key: "m", label: "3 GCs", test: n=> n === 3, v: "var(--wl-b2)"},
+  {key: "s", label: "1–2 GCs", test: n=> n <= 2, v: "var(--wl-b3)"},
+];
+function wlBand(n){ return WL_BANDS.find(b=> b.test(n || 0)); }
+function wlRow(wk, k){
+  const g = ((COMPLIANCE_WEEKS[wk]||{}).byGM||{})[k];
+  if(!g || g.manualEligible == null) return null;
+  const sz = ((TS_TRENDS.gmSize||{})[wk]||{})[k] || [0, 0];
+  const done = state.wlMetric === "gm" ? g.manualDone + (g.manualOnAuto||0) + (g.manualOnNotEligible||0) : g.manualDone;
+  return {key: k, gm: g.gm, gcs: sz[0], sellers: sz[1], elig: g.manualEligible, done, rate: trPct(done, g.manualEligible),
+    autoElig: g.autoEligible, allElig: g.eligible, allDone: g.done, band: wlBand(sz[0])};
+}
+function wlRows(wk){ return Object.keys((COMPLIANCE_WEEKS[wk]||{}).byGM||{}).map(k=> wlRow(wk, k)).filter(r=> r && r.elig > 0); }
+function wlMetricLabel(){ return state.wlMetric === "gm" ? "Total compliance of GM" : "Manual TS compliance"; }
+// line chart: pooled compliance per size band, week by week
+function wlBandChart(weeks, live, selWk){
+  const W = 600, H = 250, L = 38, R = 64, T = 16, B = 30, iw = W - L - R, ih = H - T - B;
+  const pts = WL_BANDS.map(b=> weeks.map(wk=>{
+    const rs = wlRows(wk).filter(r=> r.band === b), e = rs.reduce((a,r)=> a + r.elig, 0), d = rs.reduce((a,r)=> a + r.done, 0);
+    return rs.length ? {wk, n: rs.length, e, d, rate: trPct(d, e)} : null;
+  }));
+  const max = Math.max(100, trNice(Math.max(...pts.flat().filter(Boolean).map(p=> p.rate))));
+  const x = i=> L + (weeks.length === 1 ? iw / 2 : i * iw / (weeks.length - 1)), y = v=> T + ih - v / max * ih;
+  let s = "";
+  for(let k = 0; k <= 4; k++){ const v = max * k / 4; s += `<line class="tr-grid-l" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-6}" y="${y(v)+3.5}" text-anchor="end">${Math.round(v)}%</text>`; }
+  weeks.forEach((wk, i)=>{
+    const tip = `<b>${escapeHtml(trLabel(wk, true))}</b>${wk === live ? " (in progress)" : ""} · ${wlMetricLabel()}<br>` + WL_BANDS.map((b, j)=>{
+      const p = pts[j][i]; return `<span class="k" style="background:${b.v}"></span>${b.label}: ${p ? `<b>${p.rate}%</b> · ${p.n} GMs · ${p.d}/${p.e} (avg ${Math.round(p.e / p.n)} eligible per GM)` : "—"}`;
+    }).join("<br>") + `<br><i>Click to show this week below</i>`;
+    const half = weeks.length > 1 ? iw / (weeks.length - 1) / 2 : iw / 2;
+    s += `<rect class="tr-hit${wk === selWk ? " sel" : ""}" x="${x(i) - half}" y="${T - 10}" width="${half * 2}" height="${ih + B + 6}" rx="5" data-wlwk="${wk}" ${trTip(tip)}/>`;
+    s += `<text x="${x(i)}" y="${T + ih + 16}" text-anchor="middle" style="pointer-events:none;font-weight:600">${weekShort(wk)}${wk === live ? "*" : ""}</text>`;
+  });
+  WL_BANDS.forEach((b, j)=>{
+    let d = "", pen = false;
+    pts[j].forEach((p, i)=>{ if(!p){ pen = false; return; } d += `${pen ? "L" : "M"}${x(i).toFixed(1)},${y(p.rate).toFixed(1)} `; pen = true; });
+    s += `<path d="${d}" style="fill:none;stroke:${b.v};stroke-width:2;pointer-events:none"/>`;
+    pts[j].forEach((p, i)=>{ if(p) s += `<circle cx="${x(i)}" cy="${y(p.rate)}" r="4" style="fill:${b.v};stroke:var(--surface);stroke-width:2;pointer-events:none"/>`; });
+    const lastI = pts[j].map((p, i)=> p ? i : -1).filter(i=> i >= 0).pop();
+    if(lastI != null) b._endY = y(pts[j][lastI].rate), b._endX = x(lastI), b._end = pts[j][lastI].rate;
+  });
+  // direct labels at the line ends, nudged apart so they never overlap
+  const ends = WL_BANDS.filter(b=> b._endY != null).sort((a, b)=> a._endY - b._endY);
+  ends.forEach((b, i)=>{ if(i && b._endY - ends[i-1]._ly < 12) b._ly = ends[i-1]._ly + 12; else b._ly = b._endY; });
+  ends.forEach(b=> s += `<text x="${b._endX + 8}" y="${b._ly + 3.5}" style="pointer-events:none;font-weight:700;fill:var(--text)">${b.label}</text>`);
+  return `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Compliance by GM size, week by week">${s}</svg>`;
+}
+// scatter: one dot per GM for the picked week, x = manual-eligible sellers, y = compliance
+function wlScatter(wk){
+  const rows = wlRows(wk);
+  if(!rows.length) return `<div class="empty-state">No data for this week.</div>`;
+  const W = 600, H = 250, L = 38, R = 14, T = 16, B = 34, iw = W - L - R, ih = H - T - B;
+  const xstep = trNice(Math.max(...rows.map(r=> r.elig)) / 4), xmax = xstep * 4, ymax = Math.max(100, trNice(Math.max(...rows.map(r=> r.rate))));
+  const x = v=> L + v / xmax * iw, y = v=> T + ih - v / ymax * ih;
+  let s = "";
+  for(let k = 0; k <= 4; k++){ const v = ymax * k / 4; s += `<line class="tr-grid-l" x1="${L}" x2="${W-R}" y1="${y(v)}" y2="${y(v)}"/><text x="${L-6}" y="${y(v)+3.5}" text-anchor="end">${Math.round(v)}%</text>`; }
+  for(let k = 0; k <= 4; k++){ const v = xmax * k / 4; s += `<text x="${x(v)}" y="${T + ih + 15}" text-anchor="middle">${Math.round(v)}</text>`; }
+  s += `<text x="${L + iw / 2}" y="${T + ih + 30}" text-anchor="middle" style="font-weight:600">Manual-eligible sellers that week →</text>`;
+  s += `<line x1="${L}" x2="${W-R}" y1="${y(80)}" y2="${y(80)}" style="stroke:var(--text-faint);stroke-dasharray:4 3;"/><text x="${W-R}" y="${y(80) - 4}" text-anchor="end" style="fill:var(--text-faint)">80%</text>`;
+  // label the biggest buckets and the lowest compliance; everyone else on hover
+  const byElig = [...rows].sort((a,b)=> b.elig - a.elig).slice(0, 5).map(r=> r.key);
+  const byLow = [...rows].sort((a,b)=> a.rate - b.rate).slice(0, 3).map(r=> r.key);
+  const lab = new Set([...byElig, ...byLow]);
+  // greedy label placement: right, left, above, below of the dot; skip the label if every spot collides
+  const boxes = rows.map(r=> [x(r.elig) - 7, y(r.rate) - 7, x(r.elig) + 7, y(r.rate) + 7]);
+  const hit = (b)=> boxes.some(o=> b[0] < o[2] && b[2] > o[0] && b[1] < o[3] && b[3] > o[1]) || b[0] < L || b[2] > W - R + 30 || b[1] < 0;
+  const labels = [];
+  [...rows].filter(r=> lab.has(r.key)).sort((a,b)=> b.elig - a.elig).forEach(r=>{
+    const t = r.gm.split(/\s+/)[0], w = t.length * 5.6 + 2, cx = x(r.elig), cy = y(r.rate);
+    for(const [lx, ly, anchor] of [[cx + 9, cy + 3.5, "start"], [cx - 9, cy + 3.5, "end"], [cx, cy - 10, "middle"], [cx, cy + 17, "middle"]]){
+      const x0 = anchor === "start" ? lx : anchor === "end" ? lx - w : lx - w / 2, b = [x0, ly - 9, x0 + w, ly + 2];
+      if(!hit(b)){ boxes.push(b); labels.push(`<text x="${lx}" y="${ly}" text-anchor="${anchor}" style="pointer-events:none;fill:var(--text);font-size:10px">${escapeHtml(t)}</text>`); break; }
+    }
+  });
+  [...rows].sort((a,b)=> a.elig - b.elig).forEach(r=>{
+    const tip = `<b>${escapeHtml(r.gm)}</b> · ${escapeHtml(trLabel(wk, true))}<br>${r.gcs} GCs · ${r.sellers} roster sellers<br>`
+      + `Manual eligible <b>${r.elig}</b> · done ${r.done} · ${wlMetricLabel()} <b>${r.rate}%</b><br>Auto eligible ${r.autoElig} · total eligible ${r.allElig} · total compliance ${trPct(r.allDone, r.allElig)}%<br>`
+      + `${r.gcs ? Math.round(r.elig / r.gcs * 10) / 10 : "—"} manual-eligible per GC`;
+    s += `<circle cx="${x(r.elig)}" cy="${y(r.rate)}" r="6" style="fill:${r.band.v};stroke:var(--surface);stroke-width:2" ${trTip(tip)}/>`;
+  });
+  s += labels.join("");
+  return `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Eligible sellers vs compliance by GM">${s}</svg>`;
+}
+// table: GM x week, manual-eligible sellers (shaded by volume) with compliance underneath
+function wlTable(weeks, live, selWk){
+  const keys = new Set(); weeks.forEach(wk=> wlRows(wk).forEach(r=> keys.add(r.key)));
+  const lastWk = weeks[weeks.length - 1];
+  const rows = [...keys].map(k=>{
+    const per = weeks.map(wk=> wlRow(wk, k)), cur = wlRow(lastWk, k) || per.filter(Boolean).pop();
+    const full = per.filter((p, i)=> p && weeks[i] !== live);
+    const e = full.reduce((a,p)=> a + p.elig, 0), d = full.reduce((a,p)=> a + p.done, 0);
+    return {key: k, gm: cur.gm, gcs: cur.gcs, sellers: cur.sellers, per, avgElig: full.length ? Math.round(e / full.length) : null, avgRate: trPct(d, e), band: cur.band};
+  }).sort((a,b)=> (b.per[b.per.length-1]||{elig:-1}).elig - (a.per[a.per.length-1]||{elig:-1}).elig || (b.avgElig||0) - (a.avgElig||0));
+  const max = Math.max(1, ...rows.flatMap(r=> r.per.filter(Boolean).map(p=> p.elig)));
+  const cell = (p, wk)=>{
+    if(!p) return `<td class="z">·</td>`;
+    const pct = Math.round(Math.min(1, p.elig / max) * 80);
+    return `<td style="background:color-mix(in srgb, var(--tr-c1) ${pct}%, var(--surface));${pct > 48 ? "color:#fff;" : ""}${wk === selWk ? "outline:2px solid var(--text);outline-offset:-2px;" : ""}" ${trTip(`<b>${escapeHtml(p.gm)}</b> · ${escapeHtml(trLabel(wk, true))}<br>${p.gcs} GCs · ${p.sellers} roster sellers<br>Manual eligible <b>${p.elig}</b> · done ${p.done} · ${wlMetricLabel()} <b>${p.rate}%</b>`)}><div style="font-weight:700">${p.elig}</div><div style="font-size:10px;opacity:.85">${p.rate}%</div></td>`;
+  };
+  return `<div class="table-scroll"><table class="tr-heat wl-tab">
+    <thead><tr><th></th><th>GCs</th><th>Roster<br>sellers</th>${weeks.map(wk=> `<th data-wlwk="${wk}" style="cursor:pointer">${weekShort(wk)}${wk === live ? "*" : ""}</th>`).join("")}<th>Avg eligible<br>full weeks</th><th>Avg compliance<br>full weeks</th></tr></thead>
+    <tbody>${rows.map(r=> `<tr><td class="gm"><span class="k" style="display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;background:${r.band.v}"></span>${escapeHtml(r.gm)}</td><td>${r.gcs}</td><td>${r.sellers}</td>${r.per.map((p, i)=> cell(p, weeks[i])).join("")}<td style="font-weight:700">${r.avgElig ?? "—"}</td><td style="font-weight:700">${r.avgRate == null ? "—" : r.avgRate + "%"}</td></tr>`).join("")}</tbody>
+  </table></div>`;
+}
+function renderWorkloadPanel(){
+  const weeks = trWeeks().filter(wk=> (TS_TRENDS.gmSize||{})[wk]);
+  if(!weeks.length) return "";
+  const live = trendWeekKeys().slice(-1)[0];
+  const lastFull = [...weeks].reverse().find(wk=> wk !== live) || weeks[weeks.length - 1];
+  const selWk = weeks.includes(state.wlWeek) ? state.wlWeek : lastFull;
+  const m = state.wlMetric;
+  return `<div class="tr-panel" style="margin-top:14px;">
+    <h3 class="card-head-row" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">GM workload vs compliance <span class="seg" style="margin-left:auto"><button class="${m === "manual" ? "active" : ""}" data-wlmetric="manual">Manual TS compliance</button><button class="${m === "gm" ? "active" : ""}" data-wlmetric="gm">Total compliance of GM</button></span></h3>
+    <div class="tr-sub">Do GMs with more GCs and more eligible sellers reach lower compliance? GM size = number of GCs under the GM that week (<b>4+ GCs</b>, <b>3 GCs</b>, <b>1–2 GCs</b>). Eligible = manual-eligible sellers (the GM's own TS workload). * = week in progress.</div>
+    <div class="tr-legend">${WL_BANDS.map(b=> `<span><i style="background:${b.v};border-radius:50%"></i>${b.label}</span>`).join("")}</div>
+    <div class="tr-grid two">
+      <div><div class="tr-sub" style="margin-bottom:4px"><b>${wlMetricLabel()} by GM size, week by week</b> — all GMs of a size pooled together. Click a week to show it on the right and in the table.</div>${wlBandChart(weeks, live, selWk)}</div>
+      <div><div class="tr-sub" style="margin-bottom:4px"><b>Every GM in <span class="tr-period">${escapeHtml(trLabel(selWk, true))}</span></b> — further right = more eligible sellers, higher = better compliance. Hover a dot for the GM.</div>${wlScatter(selWk)}</div>
+    </div>
+    <div class="tr-sub" style="margin:12px 0 4px"><b>Manual-eligible sellers per GM, week by week</b> (darker = more sellers; the % under each number is ${wlMetricLabel().toLowerCase()}). Sorted by the latest week's eligible sellers; the dot is the GM's size band.</div>
+    ${wlTable(weeks, live, selWk)}
+  </div>`;
+}
+
 function renderTsTrendsCard(){
   if(!Object.keys(TS_TRENDS.days||{}).length && !Object.keys(TS_TRENDS.weeks||{}).length) return "";
   const periods = trPeriods();
@@ -1798,6 +1933,7 @@ function renderTsTrendsCard(){
         ${trChartLogged(gm, periods)}
       </div>
     </div>
+    ${renderWorkloadPanel()}
     <div class="tr-panel" style="margin-top:14px;">
       <h3>Manual TS by GM — ${wk ? "week by week" : "day by day"}</h3>
       <div class="tr-sub">Manual TS each GM logged each ${unit} (out of eligible + apart from eligible). Darker = more. Hover for the split, click a cell to open that ${unit} below.</div>
@@ -1805,7 +1941,7 @@ function renderTsTrendsCard(){
     </div>
     <div class="tr-panel" style="margin-top:14px;">
       <h3>GM by GM — <span class="tr-period">${escapeHtml(trLabel(state.trSel, true))}</span></h3>
-      <div class="tr-sub">${wk ? "Eligible and compliance are the week's numbers from the compliance table." : "Eligible = sellers eligible as of that day's last refresh (eligibility is kept for the rest of the week once a seller qualifies)."} Out of eligible = manual TS on manual- or auto-eligible sellers; apart from eligible = manual TS on not-eligible sellers, sellers removed from the roster that week, or sellers in another GM's bucket; went to auto TS = eligible sellers whose only TS that ${unit} was an auto TS. Click a column to sort.</div>
+      <div class="tr-sub">${wk ? "Eligible and compliance are the week's numbers from the compliance table." : "Eligible = sellers eligible as of that day's last refresh (eligibility is kept for the rest of the week once a seller qualifies)."} Out of eligible = manual TS on manual- or auto-eligible sellers; apart from eligible = manual TS on not-eligible sellers, sellers removed from the roster that week, or sellers in another GM's bucket; auto TS logged = eligible sellers whose only TS that ${unit} was an auto TS (no manual TS). Click a column to sort.</div>
       ${trTable(state.trSel, gms)}
     </div>
   </div>`;
