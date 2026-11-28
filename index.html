@@ -628,7 +628,7 @@ let state = {
   collapsed: {},
   sort: { field: "w1Pnl", dir: "asc" },
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
-  trView: "day", trGm: "__all__", wlMetric: "manual", wlWeek: null, trRange: 14, trSel: null, trSort: { field: "elig", dir: "desc" },
+  trView: "day", trWk: {day: [], week: []}, trGm: "__all__", wlMetric: "manual", wlWeek: null, trRange: 14, trSel: null, trSort: { field: "elig", dir: "desc" },
   bucketSort: { field: "gm", dir: "asc" }, zgSort: { field: "rate", dir: "desc" }, trendSortBy: "current", trendMetric: "manual",
   moveWeek: null, moveGm: null, moveQ: "", moveRto: "all", moveSort: { field: "name", dir: "asc" },
   cogsGm: null, cogsQ: "", cogsTarget: "all", cogsSort: { field: "target", dir: "asc" },
@@ -848,8 +848,8 @@ document.getElementById("appRoot").addEventListener("click", e=>{
   if(wlmEl){ state.wlMetric = wlmEl.dataset.wlmetric; renderCompliance(); return; }
   const trvEl = e.target.closest("[data-trview]");
   if(trvEl){ state.trView = trvEl.dataset.trview; state.trSel = null; renderCompliance(); return; }
-  const trrEl = e.target.closest("[data-trrange]");
-  if(trrEl){ state.trRange = +trrEl.dataset.trrange; renderCompliance(); return; }
+  const trqEl = e.target.closest("[data-trquick]");
+  if(trqEl){ const all = trAllWeeks(), n = +trqEl.dataset.trquick; state.trWk[state.trView === "week" ? "week" : "day"] = [all[Math.max(0, all.length - n)], all[all.length - 1]]; state.wlWeek = null; renderCompliance(); return; }
   const trsEl = e.target.closest("[data-trsel]");
   if(trsEl){ state.trSel = trsEl.dataset.trsel; if(trsEl.dataset.trgm) state.trGm = trsEl.dataset.trgm; renderCompliance(); return; }
   const trsoEl = e.target.closest("[data-trsort]");
@@ -1613,12 +1613,30 @@ function trSum(map, gm, n){
   else (map[gm] || []).forEach((x,i)=> z[i] = x);
   return z;
 }
-function trWeeks(){ return Object.keys(COMPLIANCE_WEEKS).sort().filter(wk=> Object.values(COMPLIANCE_WEEKS[wk].byGM||{}).some(g=> g.manualEligible != null)).slice(-9); }
+// every week with the auto/manual split (W40 on); the card's week filter picks a From-To range out of these
+function trAllWeeks(){ return Object.keys(COMPLIANCE_WEEKS).sort().filter(wk=> Object.values(COMPLIANCE_WEEKS[wk].byGM||{}).some(g=> g.manualEligible != null)); }
+function trRangeKeys(){
+  const all = trAllWeeks(); if(!all.length) return [null, null];
+  const v = state.trView === "week" ? "week" : "day";
+  let [f, t] = state.trWk[v] || [];
+  if(!all.includes(t)) t = all[all.length - 1];
+  if(!all.includes(f)) f = all[Math.max(0, all.indexOf(t) - (v === "week" ? 8 : 1))];   // default: 9 weeks / 2 weeks
+  if(f > t) [f, t] = [t, f];
+  state.trWk[v] = [f, t];
+  return [f, t];
+}
+function trWeeks(){ const [f, t] = trRangeKeys(); return trAllWeeks().filter(wk=> wk >= f && wk <= t); }
+function trIsoMonday(wk){
+  const [y, w] = wk.split("-W").map(Number), j4 = new Date(Date.UTC(y, 0, 4));
+  const mon = new Date(j4); mon.setUTCDate(j4.getUTCDate() - ((j4.getUTCDay() + 6) % 7) + (w - 1) * 7); return mon;
+}
 function trDays(){
   const keys = [...Object.keys(TS_TRENDS.days||{}), ...Object.keys(TS_TRENDS.dayElig||{})].sort();
-  if(!keys.length) return [];
-  const end = new Date(keys[keys.length-1] + "T00:00:00Z"), out = [];
-  for(let i = state.trRange - 1; i >= 0; i--){ const d = new Date(end); d.setUTCDate(d.getUTCDate() - i); out.push(d.toISOString().slice(0,10)); }
+  const weeks = trWeeks();
+  if(!keys.length || !weeks.length) return [];
+  const last = keys[keys.length-1], out = [];
+  const d = trIsoMonday(weeks[0]), end = trIsoMonday(weeks[weeks.length-1]); end.setUTCDate(end.getUTCDate() + 6);
+  for(; d <= end; d.setUTCDate(d.getUTCDate() + 1)){ const k = d.toISOString().slice(0,10); if(k <= last) out.push(k); }
   return out;
 }
 function trPeriods(){ return state.trView === "week" ? trWeeks() : trDays(); }
@@ -1716,7 +1734,7 @@ function trChartLogged(gm, periods){
       acc += v;
     });
     if(showVals && tot) s += `<text class="tr-val" x="${cx}" y="${y(tot) - 5}" text-anchor="middle" style="pointer-events:none">${man}</text>`;
-    const every = data.length > 16 ? 2 : 1;
+    const every = Math.max(1, Math.ceil(data.length / 16));
     if(i % every === 0 || i === data.length - 1)
       s += `<text x="${cx}" y="${T + ih + 15}" text-anchor="middle" style="pointer-events:none;${trIsSun(d.p) ? "fill:var(--text-faint)" : "font-weight:600"}">${escapeHtml(trLabel(d.p))}</text>`;
     if(state.trView !== "week" && i > 0 && new Date(d.p + "T00:00:00Z").getUTCDay() === 1)   // week boundary
@@ -1867,13 +1885,14 @@ function wlTable(weeks, live, selWk){
     const per = weeks.map(wk=> wlRow(wk, k)), cur = wlRow(lastWk, k) || per.filter(Boolean).pop();
     const full = per.filter((p, i)=> p && weeks[i] !== live);
     const e = full.reduce((a,p)=> a + p.elig, 0), d = full.reduce((a,p)=> a + p.done, 0);
-    return {key: k, gm: cur.gm, gcs: cur.gcs, sellers: cur.sellers, per, avgElig: full.length ? Math.round(e / full.length) : null, avgRate: trPct(d, e), band: cur.band};
-  }).sort((a,b)=> (b.per[b.per.length-1]||{elig:-1}).elig - (a.per[a.per.length-1]||{elig:-1}).elig || (b.avgElig||0) - (a.avgElig||0));
+    return {key: k, gm: cur.gm, gcs: cur.gcs, sellers: cur.sellers, per, avgElig: full.length ? Math.round(e / full.length) : null, avgRate: trPct(d, e), band: cur.band
+    , inLast: !!wlRow(lastWk, k)};
+  }).sort((a,b)=> (b.inLast - a.inLast) || (b.sellers - a.sellers) || (b.avgElig||0) - (a.avgElig||0));
   const max = Math.max(1, ...rows.flatMap(r=> r.per.filter(Boolean).map(p=> p.elig)));
   const cell = (p, wk)=>{
     if(!p) return `<td class="z">·</td>`;
     const pct = Math.round(Math.min(1, p.elig / max) * 80);
-    return `<td style="background:color-mix(in srgb, var(--tr-c1) ${pct}%, var(--surface));${pct > 48 ? "color:#fff;" : ""}${wk === selWk ? "outline:2px solid var(--text);outline-offset:-2px;" : ""}" ${trTip(`<b>${escapeHtml(p.gm)}</b> · ${escapeHtml(trLabel(wk, true))}<br>${p.gcs} GCs · ${p.sellers} roster sellers<br>Manual eligible <b>${p.elig}</b> · done ${p.done} · ${wlMetricLabel()} <b>${p.rate}%</b>`)}><div style="font-weight:700">${p.elig}</div><div style="font-size:10px;opacity:.85">${p.rate}%</div></td>`;
+    return `<td style="background:color-mix(in srgb, var(--tr-c1) ${pct}%, var(--surface));${pct > 48 ? "color:#fff;" : ""}${wk === selWk ? "outline:2px solid var(--text);outline-offset:-2px;" : ""}" ${trTip(`<b>${escapeHtml(p.gm)}</b> · ${escapeHtml(trLabel(wk, true))}<br>${p.gcs} GCs · ${p.sellers} roster sellers<br>Manual eligible <b>${p.elig}</b> · done ${p.done} · ${wlMetricLabel()} <b>${p.rate == null ? "—" : p.rate + "%"}</b>`)}><div style="font-weight:700">${p.elig}</div><div style="font-size:10px;opacity:.85">${p.rate == null ? "—" : p.rate + "%"}</div></td>`;
   };
   return `<div class="table-scroll"><table class="tr-heat wl-tab">
     <thead><tr><th></th><th>GCs</th><th>Roster<br>sellers</th>${weeks.map(wk=> `<th data-wlwk="${wk}" style="cursor:pointer">${weekShort(wk)}${wk === live ? "*" : ""}</th>`).join("")}<th>Avg eligible<br>full weeks</th><th>Avg compliance<br>full weeks</th></tr></thead>
@@ -1895,7 +1914,7 @@ function renderWorkloadPanel(){
       <div><div class="tr-sub" style="margin-bottom:4px"><b>${wlMetricLabel()} by GM size, week by week</b> — all GMs of a size pooled together. Click a week to show it on the right and in the table.</div>${wlBandChart(weeks, live, selWk)}</div>
       <div><div class="tr-sub" style="margin-bottom:4px"><b>Every GM in <span class="tr-period">${escapeHtml(trLabel(selWk, true))}</span></b> — further right = more eligible sellers, higher = better compliance. Hover a dot for the GM.</div>${wlScatter(selWk)}</div>
     </div>
-    <div class="tr-sub" style="margin:12px 0 4px"><b>Manual-eligible sellers per GM, week by week</b> (darker = more sellers; the % under each number is ${wlMetricLabel().toLowerCase()}). Sorted by the latest week's eligible sellers; the dot is the GM's size band.</div>
+    <div class="tr-sub" style="margin:12px 0 4px"><b>Manual-eligible sellers per GM, week by week</b> (darker = more sellers; the % under each number is ${wlMetricLabel().toLowerCase()}). Sorted by roster sellers, high to low (GMs no longer on the roster at the bottom); the dot is the GM's size band.</div>
     ${wlTable(weeks, live, selWk)}
   </div>`;
 }
@@ -1917,7 +1936,15 @@ function renderTsTrendsCard(){
         <option value="__all__">All GMs</option>${gms.map(g=> `<option value="${escapeHtml(g.key)}"${g.key === gm ? " selected" : ""}>${escapeHtml(g.gm)}</option>`).join("")}
       </select>
       <div class="seg"><button class="${wk ? "" : "active"}" data-trview="day">Day by day</button><button class="${wk ? "active" : ""}" data-trview="week">Week by week</button></div>
-      ${wk ? "" : `<div class="seg"><button class="${state.trRange === 14 ? "active" : ""}" data-trrange="14">Last 14 days</button><button class="${state.trRange === 28 ? "active" : ""}" data-trrange="28">Last 28 days</button></div>`}
+      ${(()=>{
+        const all = trAllWeeks(), [f, t] = trRangeKeys(), n = all.indexOf(t) - all.indexOf(f) + 1, lastIsT = t === all[all.length - 1];
+        const opt = (sel)=> all.map(w=> `<option value="${w}"${w === sel ? " selected" : ""}>${weekShort(w)} · ${escapeHtml(((COMPLIANCE_WEEKS[w]||{}).dateRange||"").replace(/, \d{4}$/, ""))}</option>`).join("");
+        const ss = "padding:7px 8px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:12.5px;";
+        const q = (k, l)=> `<button class="${lastIsT && n === k ? "active" : ""}" data-trquick="${k}">${l}</button>`;
+        return `<span style="font-size:12px;font-weight:600;color:var(--text-muted);margin-left:6px">Weeks</span>
+          <select id="trFrom" style="${ss}">${opt(f)}</select><span style="color:var(--text-muted);font-size:12px">to</span><select id="trTo" style="${ss}">${opt(t)}</select>
+          <div class="seg">${q(1, "This week")}${q(2, "Last 2")}${q(4, "Last 4")}${q(all.length, "All")}</div>`;
+      })()}
     </div>
     <div class="tr-grid two">
       <div class="tr-panel">
@@ -1956,7 +1983,15 @@ function renderTsTrendsCard(){
     tip.style.left = Math.max(8, Math.min(e.clientX + 14, innerWidth - w - 8)) + "px";
     tip.style.top = (e.clientY + 14 + h > innerHeight ? e.clientY - h - 10 : e.clientY + 14) + "px";
   });
-  document.addEventListener("change", e=>{ if(e.target && e.target.id === "trGmSel"){ state.trGm = e.target.value; renderCompliance(); } });
+  document.addEventListener("change", e=>{
+    const id = e.target && e.target.id;
+    if(id === "trGmSel"){ state.trGm = e.target.value; renderCompliance(); }
+    else if(id === "trFrom" || id === "trTo"){
+      const v = state.trView === "week" ? "week" : "day", cur = state.trWk[v] || [];
+      state.trWk[v] = id === "trFrom" ? [e.target.value, cur[1]] : [cur[0], e.target.value];
+      state.wlWeek = null; renderCompliance();
+    }
+  });
 })();
 
 function renderCompliance(){
