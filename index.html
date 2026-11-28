@@ -26,6 +26,7 @@
     --up-fg:#059669; --down-fg:#dc2626; --flat-fg:#8b93a1;
     --b-objective:#7c3aed; --b-potential:#059669; --b-breakeven:#0d9488; --b-health:#2563eb; --b-pending:#dc2626; --b-zerogmv:#c2410c;
     --shadow: 0 1px 2px rgba(20,22,30,.04), 0 8px 24px rgba(20,22,30,.06);
+    --tr-c1:#2a78d6; --tr-c2:#eb6834; --tr-c3:#1baf7a; --tr-c4:#a3a9b8;
     --radius:14px;
     color-scheme: light;
   }
@@ -41,6 +42,7 @@
       --up-fg:#34d399; --down-fg:#f0554f; --flat-fg:#6d7382;
       --b-objective:#a78bfa; --b-potential:#34d399; --b-breakeven:#2dd4bf; --b-health:#5b8cff; --b-pending:#f0554f; --b-zerogmv:#fb923c;
       --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    --tr-c1:#3987e5; --tr-c2:#d95926; --tr-c3:#199e70; --tr-c4:#5d6476;
       color-scheme: dark;
     }
   }
@@ -55,6 +57,7 @@
     --up-fg:#34d399; --down-fg:#f0554f; --flat-fg:#6d7382;
     --b-objective:#a78bfa; --b-potential:#34d399; --b-breakeven:#2dd4bf; --b-health:#5b8cff; --b-pending:#f0554f; --b-zerogmv:#fb923c;
     --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    --tr-c1:#3987e5; --tr-c2:#d95926; --tr-c3:#199e70; --tr-c4:#5d6476;
     color-scheme: dark;
   }
   *{box-sizing:border-box;}
@@ -324,6 +327,41 @@
   .bk-bar{ display:none; }
   .bk-bar i{ display:block; height:100%; border-radius:2px; }
   .bk-bar i.hi{ background:var(--up-fg); } .bk-bar i.mid{ background:#f59e0b; } .bk-bar i.lo{ background:var(--down-fg); }
+  .tr-grid{ display:grid; grid-template-columns:1fr; gap:14px; }
+  @media (min-width:1100px){ .tr-grid.two{ grid-template-columns:1fr 1fr; } }
+  .tr-panel{ border:1px solid var(--border); border-radius:10px; padding:12px 12px 8px; background:var(--surface); min-width:0; }
+  .tr-panel h3{ margin:0 0 2px; font-size:13px; font-weight:700; color:var(--text); }
+  .tr-panel .tr-sub{ font-size:11.5px; color:var(--text-muted); margin-bottom:8px; }
+  .tr-svg{ width:100%; height:auto; display:block; overflow:visible; }
+  .tr-svg text{ font-family:inherit; fill:var(--text-muted); font-size:10.5px; }
+  .tr-svg .tr-val{ fill:var(--text); font-weight:600; }
+  .tr-svg .tr-grid-l{ stroke:var(--border); stroke-width:1; }
+  .tr-svg .tr-hit{ fill:transparent; cursor:pointer; }
+  .tr-svg .tr-hit:hover, .tr-svg .tr-hit.sel{ fill:color-mix(in srgb, var(--text) 6%, transparent); }
+  .tr-legend{ display:flex; flex-wrap:wrap; gap:6px 14px; font-size:11.5px; color:var(--text-muted); margin:2px 0 8px; }
+  .tr-legend span{ display:inline-flex; align-items:center; gap:6px; }
+  .tr-legend i{ width:10px; height:10px; border-radius:3px; display:inline-block; }
+  .tr-c1{ background:var(--tr-c1); } .tr-c2{ background:var(--tr-c2); } .tr-c3{ background:var(--tr-c3); } .tr-c4{ background:var(--tr-c4); }
+  .tr-c1t{ background:color-mix(in srgb, var(--tr-c1) 26%, var(--surface)); } .tr-c4t{ background:color-mix(in srgb, var(--tr-c4) 35%, var(--surface)); }
+  .tr-tip{ position:fixed; z-index:9999; pointer-events:none; background:var(--surface); color:var(--text); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow); padding:8px 10px; font-size:12px; line-height:1.5; max-width:300px; }
+  .tr-tip b{ font-weight:700; } .tr-tip .k{ display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; }
+  table.tr-heat{ border-collapse:separate; border-spacing:2px; font-size:11.5px; }
+  table.tr-heat th{ font-weight:600; color:var(--text-muted); padding:4px 4px; text-align:center; white-space:nowrap; font-size:10.5px; }
+  table.tr-heat th.sun{ color:var(--text-faint); }
+  table.tr-heat td{ text-align:center; min-width:34px; height:28px; border-radius:5px; cursor:pointer; font-variant-numeric:tabular-nums; }
+  table.tr-heat td.gm{ text-align:left; cursor:default; padding:0 8px 0 2px; white-space:nowrap; font-weight:600; color:var(--text); min-width:120px; }
+  table.tr-heat td.z{ color:var(--text-faint); }
+  table.tr-heat td.sel{ outline:2px solid var(--text); outline-offset:-2px; }
+  table.tr-heat tr.all td.gm{ font-weight:800; }
+  table.tr-tab{ width:100%; border-collapse:collapse; font-size:12.5px; }
+  table.tr-tab th{ font-size:10.5px; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); font-weight:700; padding:7px 8px; border-bottom:1px solid var(--border); text-align:center; white-space:nowrap; cursor:pointer; }
+  table.tr-tab th:first-child, table.tr-tab td:first-child{ text-align:left; }
+  table.tr-tab td:first-child{ white-space:nowrap; }
+  table.tr-tab td{ padding:7px 8px; border-bottom:1px solid var(--border); text-align:center; font-variant-numeric:tabular-nums; }
+  table.tr-tab tr.all td{ font-weight:700; background:var(--surface-2); }
+  .tr-mix{ display:flex; gap:2px; height:12px; min-width:140px; border-radius:4px; overflow:hidden; }
+  .tr-mix > div{ height:100%; }
+  .tr-period{ display:inline-block; padding:2px 8px; border-radius:6px; background:var(--accent-soft); color:var(--accent); font-weight:700; font-size:12px; }
   .trend-controls{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:4px 0 10px; }
 
   .heat-grid{ display:grid; min-width:max-content; gap:3px 5px; align-items:center; }
@@ -576,6 +614,7 @@ document.getElementById("themeBtn").onclick = cycleTheme;
 // ---------- state ----------
 let SELLERS = [];
 let COMPLIANCE_WEEKS = {};   // weekKey -> doc
+let TS_TRENDS = {gms:{}, days:{}, weeks:{}, dayElig:{}};   // data/ts_trends.json (TS trends card)
 let ROSTER_CHANGES = {};     // date -> doc
 let GM_LIST = [];
 let db = null;
@@ -586,6 +625,7 @@ let state = {
   collapsed: {},
   sort: { field: "w1Pnl", dir: "asc" },
   complianceWeek: null, complianceSort: { field: "rate", dir: "desc" },
+  trView: "day", trGm: "__all__", trRange: 14, trSel: null, trSort: { field: "elig", dir: "desc" },
   bucketSort: { field: "gm", dir: "asc" }, zgSort: { field: "rate", dir: "desc" }, trendSortBy: "current", trendMetric: "manual",
   moveWeek: null, moveGm: null, moveQ: "", moveRto: "all", moveSort: { field: "name", dir: "asc" },
   cogsGm: null, cogsQ: "", cogsTarget: "all", cogsSort: { field: "target", dir: "asc" },
@@ -799,6 +839,14 @@ document.getElementById("appRoot").addEventListener("click", e=>{
   if(tpEl){ const [wk, key] = tpEl.dataset.tp.split("|"); openTrendPoint(wk, key); return; }
   const tmEl = e.target.closest("[data-trend-metric]");
   if(tmEl){ state.trendMetric = tmEl.dataset.trendMetric; renderCompliance(); return; }
+  const trvEl = e.target.closest("[data-trview]");
+  if(trvEl){ state.trView = trvEl.dataset.trview; state.trSel = null; renderCompliance(); return; }
+  const trrEl = e.target.closest("[data-trrange]");
+  if(trrEl){ state.trRange = +trrEl.dataset.trrange; renderCompliance(); return; }
+  const trsEl = e.target.closest("[data-trsel]");
+  if(trsEl){ state.trSel = trsEl.dataset.trsel; if(trsEl.dataset.trgm) state.trGm = trsEl.dataset.trgm; renderCompliance(); return; }
+  const trsoEl = e.target.closest("[data-trsort]");
+  if(trsoEl){ toggleSort(state.trSort, trsoEl.dataset.trsort); renderCompliance(); return; }
   const tsEl = e.target.closest("[data-trend-sort]");
   if(tsEl){ state.trendSortBy = tsEl.dataset.trendSort; renderCompliance(); return; }
 
@@ -875,6 +923,14 @@ document.getElementById("appRoot").addEventListener("click", e=>{
         {key:"manualEligible",label:"Total manual TS eligible"},{key:"gmDone",label:"Total TS done by GM"},{key:"manualDone",label:"TS done by GM - out of manual eligible"},{key:"manualOnAuto",label:"TS done by GM - out of auto eligible"},{key:"manualOnNotElig",label:"TS done by GM - out of not eligible"},
         {key:"manualRate",label:"Manual TS compliance %"},{key:"gmRate",label:"Total compliance of GM %"},{key:"gmPending",label:"Pending TS for GM"},
         {key:"autoEligible",label:"Total auto TS eligible"},{key:"autoDone",label:"Total auto TS done"},{key:"autoRate",label:"Auto TS compliance %"},
+      ]);
+    } else if(kind === "ts-trends"){
+      const x = window._trRowsForExport || {period: "", rows: []};
+      downloadCsv(`ts_by_gm_${x.period}.csv`, x.rows.map(r=> ({...r, mE: r.c[0], mA: r.c[1]})), [
+        {key:"gm",label:"GM"},{key:"em",label:"Eligible - manual"},{key:"ea",label:"Eligible - auto"},{key:"elig",label:"Eligible - total"},
+        {key:"mE",label:"Manual TS on manual-eligible"},{key:"mA",label:"Manual TS on auto-eligible"},{key:"onElig",label:"Manual TS - out of eligible"},
+        {key:"apart",label:"Manual TS - apart from eligible"},{key:"man",label:"Manual TS - total"},{key:"auto",label:"Went to auto TS"},
+        {key:"mrate",label:"Manual TS compliance %"},{key:"rate",label:"Total compliance %"},
       ]);
     } else if(kind === "zero-gmv-compliance"){
       const rows = window._zeroGmvRowsForExport || [];
@@ -1533,6 +1589,240 @@ function openTrendPoint(wk, key){
   document.getElementById("closeDetailBtn").onclick = closeDetail;
 }
 
+// ---- TS trends card: eligible vs done (week by week) + TS logged manual vs auto (day / week) + GM cuts.
+// Counts are sellers (a seller with two TS the same day counts once). Data: data/ts_trends.json + weekly_compliance.json.
+const TR_CATS = [
+  {i:0, label:"Manual TS · manual-eligible", cls:"tr-c1", v:"var(--tr-c1)"},
+  {i:1, label:"Manual TS · auto-eligible", cls:"tr-c2", v:"var(--tr-c2)"},
+  {i:2, label:"Manual TS · not eligible / other bucket", cls:"tr-c3", v:"var(--tr-c3)"},
+  {i:3, label:"Went to auto TS (eligible, no manual TS)", cls:"tr-c4", v:"var(--tr-c4)"},
+];
+const TR_DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const TR_MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+function trTip(html){ return `data-trtip="${escapeHtml(html)}"`; }
+function trSum(map, gm, n){
+  const z = Array(n || 4).fill(0); if(!map) return z;
+  if(gm === "__all__") Object.values(map).forEach(v=> v.forEach((x,i)=> z[i] += x));
+  else (map[gm] || []).forEach((x,i)=> z[i] = x);
+  return z;
+}
+function trWeeks(){ return Object.keys(COMPLIANCE_WEEKS).sort().filter(wk=> Object.values(COMPLIANCE_WEEKS[wk].byGM||{}).some(g=> g.manualEligible != null)).slice(-9); }
+function trDays(){
+  const keys = [...Object.keys(TS_TRENDS.days||{}), ...Object.keys(TS_TRENDS.dayElig||{})].sort();
+  if(!keys.length) return [];
+  const end = new Date(keys[keys.length-1] + "T00:00:00Z"), out = [];
+  for(let i = state.trRange - 1; i >= 0; i--){ const d = new Date(end); d.setUTCDate(d.getUTCDate() - i); out.push(d.toISOString().slice(0,10)); }
+  return out;
+}
+function trPeriods(){ return state.trView === "week" ? trWeeks() : trDays(); }
+function trIsSun(p){ return state.trView !== "week" && new Date(p + "T00:00:00Z").getUTCDay() === 0; }
+function trLabel(p, long){
+  if(state.trView === "week" || /-W/.test(p)) return long ? `${weekShort(p)} · ${(COMPLIANCE_WEEKS[p]||{}).dateRange||""}` : weekShort(p);
+  const d = new Date(p + "T00:00:00Z");
+  return long ? `${TR_DOW[d.getUTCDay()]}, ${d.getUTCDate()} ${TR_MON[d.getUTCMonth()]}` : `${TR_DOW[d.getUTCDay()]} ${d.getUTCDate()}`;
+}
+function trCounts(p, gm){ return trSum(state.trView === "week" ? (TS_TRENDS.weeks||{})[p] : (TS_TRENDS.days||{})[p], gm); }
+function trWeekElig(wk, gm){
+  const bg = (COMPLIANCE_WEEKS[wk]||{}).byGM || {};
+  const gs = gm === "__all__" ? Object.values(bg) : [bg[gm]].filter(Boolean);
+  if(!gs.length) return null;
+  const s = k=> gs.reduce((a,g)=> a + (g[k]||0), 0);
+  return {m: s("manualEligible"), a: s("autoEligible"), md: s("manualDone"), ad: s("autoDone"), elig: s("eligible"), done: s("done")};
+}
+function trElig(p, gm){
+  if(state.trView === "week") return trWeekElig(p, gm);
+  const de = (TS_TRENDS.dayElig||{})[p]; if(!de) return null;
+  const v = trSum(de, gm, 2); return {m: v[0], a: v[1], elig: v[0] + v[1]};
+}
+function trNice(v){ if(v <= 5) return 5; const p = Math.pow(10, Math.floor(Math.log10(v))); for(const m of [1,1.5,2,2.5,3,4,5,6,8,10]) if(m*p >= v) return m*p; return 10*p; }
+function trPct(a, b){ return b ? Math.round(a / b * 100) : null; }
+// bar with 4px rounded top, flat on the baseline
+function trBar(x, y, w, h, fill, r){
+  if(h <= 0) return "";
+  r = Math.min(r == null ? 4 : r, h, w / 2);
+  return `<path d="M${x},${y+h} V${y+r} Q${x},${y} ${x+r},${y} H${x+w-r} Q${x+w},${y} ${x+w},${y+r} V${y+h} Z" style="fill:${fill}"/>`;
+}
+function trAxis(W, L, R, T, ih, max){
+  let s = "";
+  for(let k = 0; k <= 4; k++){
+    const v = max * k / 4, y = T + ih - ih * k / 4;
+    s += `<line class="tr-grid-l" x1="${L}" x2="${W-R}" y1="${y}" y2="${y}"/><text x="${L-6}" y="${y+3.5}" text-anchor="end">${Math.round(v)}</text>`;
+  }
+  return s;
+}
+// Chart 1: week by week, eligible vs done, manual and auto side by side; compliance % on top of each bar
+function trChartElig(gm){
+  const live = trendWeekKeys().slice(-1)[0];
+  const data = trWeeks().map(wk=> ({wk, e: trWeekElig(wk, gm)})).filter(d=> d.e);
+  if(!data.length) return `<div class="empty-state">No weekly data for this GM.</div>`;
+  const W = 600, H = 270, L = 38, R = 8, T = 20, B = 46, iw = W - L - R, ih = H - T - B;
+  const max = trNice(Math.max(...data.map(d=> Math.max(d.e.m, d.e.a))));
+  const gw = iw / data.length, bw = Math.max(6, Math.min(22, (gw - 16) / 2));
+  const y = v=> T + ih - v / max * ih;
+  let s = trAxis(W, L, R, T, ih, max);
+  data.forEach((d, i)=>{
+    const cx = L + i * gw + gw / 2, xm = cx - bw - 2, xa = cx + 2, e = d.e;
+    const sel = state.trView === "week" && state.trSel === d.wk;
+    const tip = `<b>${escapeHtml(trLabel(d.wk, true))}</b>${d.wk === live ? " (in progress)" : ""}<br>`
+      + `<span class="k tr-c1"></span>Manual eligible <b>${e.m}</b> · done ${e.md} · <b>${trPct(e.md, e.m) ?? "—"}%</b><br>`
+      + `<span class="k tr-c4"></span>Auto eligible <b>${e.a}</b> · done ${e.ad} · <b>${trPct(e.ad, e.a) ?? "—"}%</b><br>`
+      + `Total eligible <b>${e.elig}</b> · done ${e.done} · total compliance <b>${trPct(e.done, e.elig) ?? "—"}%</b>`;
+    s += `<rect class="tr-hit${sel ? " sel" : ""}" x="${L + i * gw + 2}" y="${T - 14}" width="${gw - 4}" height="${ih + 14 + B - 4}" rx="6" data-trsel="${d.wk}" data-trview-go="week" ${trTip(tip)}/>`;
+    s += trBar(xm, y(e.m), bw, T + ih - y(e.m), "color-mix(in srgb, var(--tr-c1) 26%, var(--surface))");
+    s += trBar(xm, y(e.md), bw, T + ih - y(e.md), "var(--tr-c1)");
+    s += trBar(xa, y(e.a), bw, T + ih - y(e.a), "color-mix(in srgb, var(--tr-c4) 35%, var(--surface))");
+    s += trBar(xa, y(e.ad), bw, T + ih - y(e.ad), "var(--tr-c4)");
+    const pm = trPct(e.md, e.m), pa = trPct(e.ad, e.a);
+    // % labels: nudge apart when the two bars are about the same height so they never touch
+    const close = pm != null && pa != null && Math.abs(y(e.m) - y(e.a)) < 12;
+    if(pm != null) s += `<text class="tr-val" x="${xm + bw/2 - (close ? 3 : 0)}" y="${y(e.m) - 5 - (close && y(e.m) <= y(e.a) ? 9 : 0)}" text-anchor="middle" style="pointer-events:none;font-size:9.5px">${pm}%</text>`;
+    if(pa != null) s += `<text class="tr-val" x="${xa + bw/2 + (close ? 3 : 0)}" y="${y(e.a) - 5 - (close && y(e.a) < y(e.m) ? 9 : 0)}" text-anchor="middle" style="pointer-events:none;font-size:9.5px">${pa}%</text>`;
+    s += `<text x="${cx}" y="${T + ih + 15}" text-anchor="middle" style="pointer-events:none;font-weight:600">${weekShort(d.wk)}${d.wk === live ? "*" : ""}</text>`;
+    s += `<text x="${cx}" y="${T + ih + 29}" text-anchor="middle" style="pointer-events:none">${e.elig} elig.</text>`;
+    s += `<text x="${cx}" y="${T + ih + 42}" text-anchor="middle" style="pointer-events:none;font-weight:700;fill:var(--text)">${trPct(e.done, e.elig) ?? "—"}%</text>`;
+  });
+  return `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="Eligible sellers and TS done, week by week">${s}</svg>`;
+}
+// Chart 2: TS logged per day / week, stacked manual (3 kinds) + went to auto TS; manual total on top
+function trChartLogged(gm, periods){
+  const data = periods.map(p=> ({p, c: trCounts(p, gm)}));
+  const W = 600, H = 270, L = 38, R = 8, T = 20, B = 34, iw = W - L - R, ih = H - T - B;
+  const max = trNice(Math.max(1, ...data.map(d=> d.c.reduce((a,b)=> a+b, 0))));
+  const gw = iw / Math.max(1, data.length), bw = Math.max(5, Math.min(30, gw * 0.62));
+  const y = v=> T + ih - v / max * ih;
+  const showVals = data.length <= 16;
+  let s = trAxis(W, L, R, T, ih, max);
+  data.forEach((d, i)=>{
+    const cx = L + i * gw + gw / 2, x = cx - bw / 2, c = d.c, man = c[0] + c[1] + c[2], tot = man + c[3];
+    const sel = state.trSel === d.p;
+    const tip = `<b>${escapeHtml(trLabel(d.p, true))}</b>${trIsSun(d.p) ? " (Sunday)" : ""}<br>`
+      + TR_CATS.map(k=> `<span class="k ${k.cls}"></span>${k.label}: <b>${c[k.i]}</b>`).join("<br>")
+      + `<br>Manual TS total <b>${man}</b> · all TS <b>${tot}</b>`;
+    s += `<rect class="tr-hit${sel ? " sel" : ""}" x="${L + i * gw + 1}" y="${T - 14}" width="${Math.max(2, gw - 2)}" height="${ih + 14 + B - 4}" rx="5" data-trsel="${d.p}" ${trTip(tip)}/>`;
+    let acc = 0; const segs = TR_CATS.map(k=> c[k.i]);
+    const topIdx = segs.reduce((t, v, j)=> v > 0 ? j : t, -1);
+    segs.forEach((v, j)=>{
+      if(!v) return;
+      const y0 = y(acc + v), h = y(acc) - y0;
+      const gap = acc > 0 ? 2 : 0;   // 2px surface gap between stacked segments
+      s += j === topIdx ? trBar(x, y0, bw, h - gap, TR_CATS[j].v) : `<rect x="${x}" y="${y0}" width="${bw}" height="${Math.max(0, h - gap)}" style="fill:${TR_CATS[j].v}"/>`;
+      acc += v;
+    });
+    if(showVals && tot) s += `<text class="tr-val" x="${cx}" y="${y(tot) - 5}" text-anchor="middle" style="pointer-events:none">${man}</text>`;
+    const every = data.length > 16 ? 2 : 1;
+    if(i % every === 0 || i === data.length - 1)
+      s += `<text x="${cx}" y="${T + ih + 15}" text-anchor="middle" style="pointer-events:none;${trIsSun(d.p) ? "fill:var(--text-faint)" : "font-weight:600"}">${escapeHtml(trLabel(d.p))}</text>`;
+    if(state.trView !== "week" && i > 0 && new Date(d.p + "T00:00:00Z").getUTCDay() === 1)   // week boundary
+      s += `<line x1="${L + i * gw}" x2="${L + i * gw}" y1="${T - 6}" y2="${T + ih}" style="stroke:var(--text-faint);stroke-dasharray:3 3;"/>`;
+  });
+  return `<svg class="tr-svg" viewBox="0 0 ${W} ${H}" role="img" aria-label="TS logged, manual and auto">${s}</svg>`;
+}
+function trGmList(periods){
+  const keys = new Set();
+  periods.forEach(p=>{
+    Object.keys((state.trView === "week" ? TS_TRENDS.weeks : TS_TRENDS.days)[p] || {}).forEach(k=> keys.add(k));
+    if(state.trView === "week") Object.keys((COMPLIANCE_WEEKS[p]||{}).byGM || {}).forEach(k=> keys.add(k));
+    else Object.keys((TS_TRENDS.dayElig||{})[p] || {}).forEach(k=> keys.add(k));
+  });
+  const nm = k=> (TS_TRENDS.gms||{})[k] || k;
+  return [...keys].map(k=> ({key: k, gm: nm(k)})).sort((a,b)=> a.gm.localeCompare(b.gm));
+}
+// Chart 3: manual TS per GM per day / week (heatmap, one hue light -> dark)
+function trHeat(periods, gms){
+  const man = (p, k)=> { const c = trCounts(p, k); return c[0] + c[1] + c[2]; };
+  const max = Math.max(1, ...gms.flatMap(g=> periods.map(p=> man(p, g.key))));
+  const cell = (p, g, isAll)=>{
+    const c = trCounts(p, g.key), v = c[0] + c[1] + c[2];
+    const pct = isAll ? 0 : Math.round(Math.min(1, v / max) * 88);
+    const tip = `<b>${escapeHtml(g.gm)}</b> · ${escapeHtml(trLabel(p, true))}<br>` + TR_CATS.map(k=> `<span class="k ${k.cls}"></span>${k.label}: <b>${c[k.i]}</b>`).join("<br>");
+    const style = isAll ? "background:var(--surface-2);font-weight:700;" : v ? `background:color-mix(in srgb, var(--tr-c1) ${pct}%, var(--surface));${pct > 50 ? "color:#fff;font-weight:600;" : ""}` : "";
+    return `<td class="${v ? "" : "z"}${state.trSel === p && (isAll ? state.trGm === "__all__" : state.trGm === g.key) ? " sel" : ""}" style="${style}" data-trsel="${p}" data-trgm="${escapeHtml(g.key)}" ${trTip(tip)}>${v || "·"}</td>`;
+  };
+  const all = {key: "__all__", gm: "All GMs"};
+  return `<div class="table-scroll"><table class="tr-heat">
+    <thead><tr><th></th>${periods.map(p=> `<th class="${trIsSun(p) ? "sun" : ""}">${escapeHtml(trLabel(p))}</th>`).join("")}<th>Total</th></tr></thead>
+    <tbody>
+      <tr class="all"><td class="gm">All GMs</td>${periods.map(p=> cell(p, all, true)).join("")}<td style="font-weight:700">${periods.reduce((a,p)=> a + man(p, "__all__"), 0)}</td></tr>
+      ${gms.map(g=> `<tr><td class="gm">${escapeHtml(g.gm)}</td>${periods.map(p=> cell(p, g)).join("")}<td style="font-weight:700">${periods.reduce((a,p)=> a + man(p, g.key), 0)}</td></tr>`).join("")}
+    </tbody></table></div>`;
+}
+// Table: one period, every GM — eligible, manual out of eligible, manual apart from eligible, went to auto TS
+function trTable(p, gms){
+  const wk = state.trView === "week";
+  const row = (g)=>{
+    const c = trCounts(p, g.key), e = trElig(p, g.key) || {m: 0, a: 0, elig: 0};
+    return {key: g.key, gm: g.gm, em: e.m, ea: e.a, elig: e.elig, onElig: c[0] + c[1], apart: c[2], auto: c[3], man: c[0] + c[1] + c[2], c,
+      rate: wk ? trPct(e.done || 0, e.elig) : null, mrate: wk ? trPct(e.md || 0, e.m) : null};
+  };
+  const rows = sortRows(gms.map(row).filter(r=> r.elig || r.man || r.auto), state.trSort.field, state.trSort.dir);
+  const tot = row({key: "__all__", gm: "All GMs"});
+  const mix = r=>{ const t = r.c.reduce((a,b)=> a+b, 0); return t ? `<div class="tr-mix">${TR_CATS.map(k=> r.c[k.i] ? `<div class="${k.cls}" style="flex:${r.c[k.i]}"></div>` : "").join("")}</div>` : `<span style="color:var(--text-faint)">—</span>`; };
+  const cols = [["gm","GM"],["em","Eligible · manual"],["ea","Eligible · auto"],["elig","Eligible · total"],["onElig","Manual TS · out of eligible"],["apart","Manual TS · apart from eligible"],["man","Manual TS · total"],["auto","Went to auto TS"]]
+    .concat(wk ? [["mrate","Manual TS compliance"],["rate","Total compliance"]] : []);
+  const td = (r)=> `<td>${escapeHtml(r.gm)}</td><td>${r.em}</td><td>${r.ea}</td><td>${r.elig}</td><td>${r.onElig}</td><td>${r.apart}</td><td><b>${r.man}</b></td><td>${r.auto}</td>${wk ? `<td>${r.mrate == null ? "—" : r.mrate + "%"}</td><td>${r.rate == null ? "—" : r.rate + "%"}</td>` : ""}<td>${mix(r)}</td>`;
+  window._trRowsForExport = {period: p, rows: [tot, ...rows]};
+  return `<div class="table-scroll"><table class="tr-tab">
+    <thead><tr>${cols.map(([k,l])=> `<th data-trsort="${k}">${l}${sortArrow(k, state.trSort)}</th>`).join("")}<th style="cursor:default">Mix</th></tr></thead>
+    <tbody><tr class="all">${td(tot)}</tr>${rows.map(r=> `<tr>${td(r)}</tr>`).join("")}</tbody></table></div>`;
+}
+function renderTsTrendsCard(){
+  if(!Object.keys(TS_TRENDS.days||{}).length && !Object.keys(TS_TRENDS.weeks||{}).length) return "";
+  const periods = trPeriods();
+  if(!periods.length) return "";
+  if(!periods.includes(state.trSel)) state.trSel = periods[periods.length - 1];
+  const gms = trGmList(periods);
+  if(state.trGm !== "__all__" && !gms.some(g=> g.key === state.trGm)) state.trGm = "__all__";
+  const gm = state.trGm, gmName = gm === "__all__" ? "All GMs" : (TS_TRENDS.gms[gm] || gm);
+  const wk = state.trView === "week", unit = wk ? "week" : "day";
+  const legend = TR_CATS.map(k=> `<span><i class="${k.cls}"></i>${k.label}</span>`).join("");
+  return `<div class="card">
+    <h2 class="card-head-row">TS trends — eligible vs done, manual vs auto, GM by GM <button class="btn-download-sm" data-download="ts-trends" title="Download the GM table below as CSV">⬇ CSV</button></h2>
+    <div class="trend-controls">
+      <select id="trGmSel" class="tr-gm-sel" style="padding:7px 10px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);font:inherit;font-size:12.5px;">
+        <option value="__all__">All GMs</option>${gms.map(g=> `<option value="${escapeHtml(g.key)}"${g.key === gm ? " selected" : ""}>${escapeHtml(g.gm)}</option>`).join("")}
+      </select>
+      <div class="seg"><button class="${wk ? "" : "active"}" data-trview="day">Day by day</button><button class="${wk ? "active" : ""}" data-trview="week">Week by week</button></div>
+      ${wk ? "" : `<div class="seg"><button class="${state.trRange === 14 ? "active" : ""}" data-trrange="14">Last 14 days</button><button class="${state.trRange === 28 ? "active" : ""}" data-trrange="28">Last 28 days</button></div>`}
+    </div>
+    <div class="tr-grid two">
+      <div class="tr-panel">
+        <h3>Eligible vs done — week by week · ${escapeHtml(gmName)}</h3>
+        <div class="tr-sub">Each week: manual-eligible (left bar) and auto-eligible (right bar) sellers; the solid part is done, the % on top is compliance. Under each week: total eligible and total compliance. * = week in progress.</div>
+        <div class="tr-legend"><span><i class="tr-c1t"></i>Manual eligible</span><span><i class="tr-c1"></i>Manual done</span><span><i class="tr-c4t"></i>Auto eligible</span><span><i class="tr-c4"></i>Auto done</span></div>
+        ${trChartElig(gm)}
+      </div>
+      <div class="tr-panel">
+        <h3>TS logged — ${wk ? "week by week" : "day by day"} · ${escapeHtml(gmName)}</h3>
+        <div class="tr-sub">Sellers that got a TS each ${unit}, by kind. The number on top is manual TS that ${unit}. ${wk ? "" : "Dashed line = new week (Monday)."} Click a bar to see that ${unit} GM by GM below.</div>
+        <div class="tr-legend">${legend}</div>
+        ${trChartLogged(gm, periods)}
+      </div>
+    </div>
+    <div class="tr-panel" style="margin-top:14px;">
+      <h3>Manual TS by GM — ${wk ? "week by week" : "day by day"}</h3>
+      <div class="tr-sub">Manual TS each GM logged each ${unit} (out of eligible + apart from eligible). Darker = more. Hover for the split, click a cell to open that ${unit} below.</div>
+      ${trHeat(periods, gms)}
+    </div>
+    <div class="tr-panel" style="margin-top:14px;">
+      <h3>GM by GM — <span class="tr-period">${escapeHtml(trLabel(state.trSel, true))}</span></h3>
+      <div class="tr-sub">${wk ? "Eligible and compliance are the week's numbers from the compliance table." : "Eligible = sellers eligible as of that day's last refresh (eligibility is kept for the rest of the week once a seller qualifies)."} Out of eligible = manual TS on manual- or auto-eligible sellers; apart from eligible = manual TS on not-eligible sellers, sellers removed from the roster that week, or sellers in another GM's bucket; went to auto TS = eligible sellers whose only TS that ${unit} was an auto TS. Click a column to sort.</div>
+      ${trTable(state.trSel, gms)}
+    </div>
+  </div>`;
+}
+(function(){
+  const tip = document.createElement("div"); tip.className = "tr-tip"; tip.hidden = true; document.body.appendChild(tip);
+  document.addEventListener("mousemove", e=>{
+    const t = e.target.closest && e.target.closest("[data-trtip]");
+    if(!t){ if(!tip.hidden) tip.hidden = true; return; }
+    tip.innerHTML = t.dataset.trtip; tip.hidden = false;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.max(8, Math.min(e.clientX + 14, innerWidth - w - 8)) + "px";
+    tip.style.top = (e.clientY + 14 + h > innerHeight ? e.clientY - h - 10 : e.clientY + 14) + "px";
+  });
+  document.addEventListener("change", e=>{ if(e.target && e.target.id === "trGmSel"){ state.trGm = e.target.value; renderCompliance(); } });
+})();
+
 function renderCompliance(){
   const body = document.getElementById("complianceBody");
   if(!body) return;
@@ -1580,6 +1870,7 @@ function renderCompliance(){
       </table></div>
       ${hasSplit ? '' : '<div class="ts-meta" style="margin-top:6px;">Auto/manual split wasn\'t tracked for this week yet — only totals are available.</div>'}
     </div>
+    ${renderTsTrendsCard()}
     ${renderTrendCard()}
     <div class="card">
       <h2 class="card-head-row">Bucket totals by GM <span style="font-weight:400;color:var(--text-faint);font-size:11.5px;">— click a count to see which sellers</span> <button class="btn-download-sm" data-download="bucket-breakdown" title="Download as CSV">⬇ CSV</button></h2>
@@ -2056,11 +2347,13 @@ function wireTab(){
 // ---------- data loading (plain JSON files, refreshed by the daily pipeline) ----------
 async function init(){
   try{
-    const [gmSellersMap, complianceMap, rosterMap] = await Promise.all([
+    const [gmSellersMap, complianceMap, rosterMap, trendsMap] = await Promise.all([
       fetch('data/gm_sellers.json', {cache:"no-store"}).then(r=>r.json()),
       fetch('data/weekly_compliance.json', {cache:"no-store"}).then(r=>r.json()).catch(()=>({})),
       fetch('data/roster_changes.json', {cache:"no-store"}).then(r=>r.json()).catch(()=>({})),
+      fetch('data/ts_trends.json', {cache:"no-store"}).then(r=>r.json()).catch(()=>null),
     ]);
+    if(trendsMap) TS_TRENDS = trendsMap;
     const gmDocs = Object.entries(gmSellersMap).map(([id, data])=>({ id, data: () => data }));
     flattenSnapshot(gmDocs);
     COMPLIANCE_WEEKS = complianceMap;
